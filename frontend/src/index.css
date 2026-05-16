@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", "system-ui", "sans-serif";
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+}
+
+@layer base {
+  :root[data-accent="indigo"] {
+    --accent-primary: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-soft: rgba(79, 70, 229, 0.1);
+    --accent-shadow: rgba(79, 70, 229, 0.2);
+  }
+  :root[data-accent="emerald"] {
+    --accent-primary: #059669;
+    --accent-hover: #047857;
+    --accent-soft: rgba(5, 150, 105, 0.1);
+    --accent-shadow: rgba(5, 150, 105, 0.2);
+  }
+  :root[data-accent="rose"] {
+    --accent-primary: #e11d48;
+    --accent-hover: #be123c;
+    --accent-soft: rgba(225, 29, 72, 0.1);
+    --accent-shadow: rgba(225, 29, 72, 0.2);
+  }
+
+  .bg-accent { background-color: var(--accent-primary) !important; }
+  .bg-accent-hover:hover { background-color: var(--accent-hover) !important; }
+  .text-accent { color: var(--accent-primary) !important; }
+  .border-accent { border-color: var(--accent-primary) !important; }
+  .ring-accent { --tw-ring-color: var(--accent-primary) !important; }
+  .shadow-accent { --tw-shadow-color: var(--accent-shadow) !important; }
+  .bg-accent-soft { background-color: var(--accent-soft) !important; }
+
+  html, body {
+    @apply m-0 p-0 bg-slate-50 text-slate-900 antialiased min-h-screen w-full;
+    @apply dark:bg-slate-900 dark:text-slate-100;
+    font-family: var(--font-sans);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  #root {
+    @apply min-h-screen w-full m-0 p-0 text-left;
+    max-width: none;
+    border: none;
+  }
+}
+
+/* Scrollbar premium */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full hover:bg-slate-300;
+}
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 hover:bg-slate-500;
+}
