@@ -31,10 +31,19 @@ export const mammographyApi = {
   update: (id, data) => api.put(`/mammographies/${id}`, data),
   delete: (id) => api.delete(`/mammographies/${id}`),
   getStats: () => api.get('/mammographies/stats/dashboard'),
+  export: (filters = {}) => {
+    const params = new URLSearchParams({ ...filters });
+    return api.get(`/mammographies/export?${params.toString()}`);
+  },
+};
+
+export const patientApi = {
+  getHistory: (dni) => api.get(`/patients/${dni}/history`),
 };
 
 export const userApi = {
   getAll: () => api.get('/users'),
+  getById: (id) => api.get(`/users/${id}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),

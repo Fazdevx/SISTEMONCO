@@ -9,6 +9,16 @@ const listUsers = async (req, res) => {
   }
 };
 
+const getUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await userService.getUser(id);
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
     const { email, password, nombres, rol, establecimiento_id, microred_id } = req.body;
@@ -40,4 +50,4 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { listUsers, createUser, updateUser, deleteUser };
+module.exports = { listUsers, getUser, createUser, updateUser, deleteUser };

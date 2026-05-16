@@ -16,51 +16,49 @@ export default function UserModal({ isOpen, onClose, userId, onSuccess }) {
   });
 
   useEffect(() => {
-    if (isOpen) {
-      fetchEstablecimientos();
-      if (userId) {
-        fetchUser();
-      } else {
-        setFormData({
-          nombres: '',
-          email: '',
-          password: '',
-          rol: 'establecimiento',
-          establecimiento_id: '',
-        });
+    const loadAllData = async () => {
+      if (!isOpen) return;
+
+      try {
+        // 1. Cargar establecimientos siempre
+        const estRes = await establishmentApi.getEstablecimientos();
+        setEstablecimientos(estRes.data || []);
+
+        // 2. Si hay ID, cargar usuario
+        if (userId) {
+          setInitialLoading(true);
+          const userRes = await userApi.getById(userId);
+          const u = userRes.data;
+          console.log('DATOS CARGADOS EN MODAL:', u);
+          
+          if (u) {
+            setFormData({
+              nombres: u.nombres || '',
+              email: u.email || '',
+              password: '',
+              rol: u.rol || 'establecimiento',
+              establecimiento_id: u.establecimiento_id || '',
+            });
+          }
+        } else {
+          // Reset para nuevo usuario
+          setFormData({
+            nombres: '',
+            email: '',
+            password: '',
+            rol: 'establecimiento',
+            establecimiento_id: '',
+          });
+        }
+      } catch (err) {
+        console.error('Error al cargar datos en modal:', err);
+      } finally {
+        setInitialLoading(false);
       }
-    }
+    };
+
+    loadAllData();
   }, [isOpen, userId]);
-
-  const fetchEstablecimientos = async () => {
-    try {
-      const res = await establishmentApi.getEstablecimientos();
-      setEstablecimientos(res.data);
-    } catch (err) {
-      console.error('Error al cargar establecimientos:', err);
-    }
-  };
-
-  const fetchUser = async () => {
-    setInitialLoading(true);
-    try {
-      const res = await userApi.getAll(); // En un entorno real usaríamos getById
-      const user = res.data.find(u => u.id === userId);
-      if (user) {
-        setFormData({
-          nombres: user.nombres || '',
-          email: user.auth_user?.email || '',
-          password: '', // No cargamos el password por seguridad
-          rol: user.rol || 'establecimiento',
-          establecimiento_id: user.establecimiento_id || '',
-        });
-      }
-    } catch (err) {
-      console.error('Error al cargar usuario:', err);
-    } finally {
-      setInitialLoading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -144,10 +142,9 @@ export default function UserModal({ isOpen, onClose, userId, onSuccess }) {
                     <input
                       type="email"
                       required
-                      disabled={!!userId}
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all font-bold text-slate-700 dark:text-white disabled:opacity-50"
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all font-bold text-slate-700 dark:text-white"
                     />
                   </div>
 

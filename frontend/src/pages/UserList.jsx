@@ -61,7 +61,7 @@ export default function UserList() {
 
     const matchesSearch = !search ||
       u.nombres?.toLowerCase().includes(search.toLowerCase()) ||
-      u.auth_user?.email?.toLowerCase().includes(search.toLowerCase());
+      u.email?.toLowerCase().includes(search.toLowerCase());
 
     const matchesRol = !filterRol || u.rol === filterRol;
 
@@ -194,7 +194,7 @@ export default function UserList() {
                           </div>
                           <div>
                             <div className="text-sm font-black text-slate-800 dark:text-white">{u.nombres || 'Sin nombre'}</div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500 font-bold">{u.auth_user?.email || 'S/E'}</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500 font-bold">{u.email || 'S/E'}</div>
                           </div>
                         </div>
                       </td>
@@ -241,6 +241,7 @@ export default function UserList() {
       </div>
 
       <UserModal
+        key={selectedUserId || 'new'}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         userId={selectedUserId}

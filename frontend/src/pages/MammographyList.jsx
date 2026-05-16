@@ -14,11 +14,14 @@ import {
   ArrowUpDown,
   MoreVertical,
   Building2,
-  X
+  X,
+  Download,
+  History
 } from 'lucide-react';
 import { mammographyApi, establishmentApi } from '../../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import MammographyModal from '../components/MammographyModal';
+import PatientHistoryModal from '../components/PatientHistoryModal';
 
 export default function MammographyList() {
   const { isAdmin } = useAuth();
@@ -34,10 +37,14 @@ export default function MammographyList() {
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
   const [establecimientos, setEstablecimientos] = useState([]);
 
+  // Historial Paciente
+  const [historyDni, setHistoryDni] = useState(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   // Lógica de Debounce para búsqueda
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search);
+      setDebouncedSearch(search.trim());
       setPage(1);
     }, 400);
     return () => clearTimeout(timer);
@@ -90,6 +97,43 @@ export default function MammographyList() {
 
   const totalPages = Math.ceil(total / 10);
 
+  const handleExport = async () => {
+    try {
+      const filters = {};
+      if (debouncedSearch) filters.dni = debouncedSearch;
+      if (filterBirads) filters.birads_mx = filterBirads;
+      if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
+
+      const res = await mammographyApi.export(filters);
+      const data = res.data;
+
+      const headers = ['DNI', 'Paciente', 'Fecha', 'BI-RADS', 'Establecimiento', 'Resultado', 'Sugerencia'];
+      const rows = data.map(m => [
+        m.atencion?.paciente?.dni,
+        m.atencion?.paciente?.nombres,
+        m.atencion?.fecha,
+        m.birads_mx,
+        m.atencion?.establecimiento?.nombre,
+        m.resultados_mx?.replace(/,/g, ';'),
+        m.sugerencia_mx?.replace(/,/g, ';')
+      ]);
+
+      const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `reporte_mamografias_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      alert('No se pudo generar la exportación');
+    }
+  };
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto min-h-screen">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -98,19 +142,27 @@ export default function MammographyList() {
           <p className="text-slate-500 dark:text-slate-400 mt-1">Monitoreo y gestión de pacientes tamizados en el sistema</p>
         </div>
 
-        <button
-          onClick={() => {
-            setSelectedId(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white px-6 py-3.5 rounded-2xl font-bold shadow-xl shadow-accent transition-all active:scale-95"
-        >
-          <Plus size={20} />
-          Nueva Atención
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-6 py-3.5 rounded-2xl font-bold shadow-sm transition-all active:scale-95"
+          >
+            <Download size={20} />
+            Exportar
+          </button>
+          <button
+            onClick={() => {
+              setSelectedId(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white px-6 py-3.5 rounded-2xl font-bold shadow-xl shadow-accent transition-all active:scale-95"
+          >
+            <Plus size={20} />
+            Nueva Atención
+          </button>
+        </div>
       </div>
 
-      {/* Control Bar Mejorada */}
       <div className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 mb-8 transition-colors duration-300">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-5 relative">
@@ -182,7 +234,7 @@ export default function MammographyList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -238,6 +290,18 @@ export default function MammographyList() {
                       </td>
                       <td className="px-8 py-5 text-right">
                         <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                const cleanDni = m.atencion?.paciente?.dni?.toString().trim();
+                                console.log('Abriendo historial para DNI:', cleanDni);
+                                setHistoryDni(cleanDni);
+                                setIsHistoryOpen(true);
+                              }}
+                            title="Ver Historial"
+                            className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-100"
+                          >
+                            <History size={18} />
+                          </button>
                           <button
                             onClick={() => {
                               setSelectedId(m.id);
@@ -268,7 +332,6 @@ export default function MammographyList() {
           </table>
         </div>
 
-        {/* Footer info & Pagination */}
         <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-700/30 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-slate-400 font-black uppercase tracking-widest">
             SISTEMONCO <span className="mx-2">|</span> {total} REGISTROS ENCONTRADOS
@@ -300,10 +363,15 @@ export default function MammographyList() {
         onClose={() => setIsModalOpen(false)}
         mammographyId={selectedId}
         onSuccess={() => {
-          // Recargar datos
-          setPage(1); // O mantener la página actual
-          window.location.reload(); // Forma rápida de recargar por ahora
+          setPage(1);
+          window.location.reload();
         }}
+      />
+
+      <PatientHistoryModal
+        dni={historyDni}
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
       />
     </div>
   );

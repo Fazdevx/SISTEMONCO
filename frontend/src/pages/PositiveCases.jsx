@@ -13,10 +13,12 @@ import {
   Download,
   Filter,
   RefreshCw,
-  X
+  X,
+  History
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import PatientHistoryModal from '../components/PatientHistoryModal';
 
 
 const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
@@ -25,11 +27,6 @@ const extraerBirads = (raw) => {
   if (!raw) return null;
   const match = (raw + '').match(/BI-RADS[:\s]*(.+)/i);
   return match ? match[1].trim() : (raw + '').trim();
-};
-
-const esPositivo = (raw) => {
-  const label = extraerBirads(raw);
-  return label ? POSITIVOS_REGEX.test(label) : false;
 };
 
 const getBiradsStyle = (birads) => {
@@ -51,19 +48,21 @@ export default function PositiveCases() {
   const [filterBirads, setFilterBirads] = useState('');
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
   const [establecimientos, setEstablecimientos] = useState([]);
+
+  // Historial Paciente
+  const [historyDni, setHistoryDni] = useState(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   const LIMIT = 15;
 
   const fetchCases = async () => {
     setLoading(true);
     try {
-      // Pasamos el objeto de filtros correctamente { soloPositivos: true }
       const res = await mammographyApi.getAll(1, 1000, { soloPositivos: true });
       let positivos = (res.data?.data || []);
 
-      // Refuerzo de seguridad: filtrar localmente solo BI-RADS 4
       positivos = positivos.filter(m => POSITIVOS_REGEX.test((m.birads_mx || '').trim()));
 
-      // Deduplicar por DNI (mantener el registro más reciente)
       const seen = new Map();
       positivos.sort((a, b) => new Date(b.atencion?.fecha) - new Date(a.atencion?.fecha));
       positivos.forEach(m => {
@@ -71,13 +70,11 @@ export default function PositiveCases() {
         if (dni && !seen.has(dni)) {
           seen.set(dni, m);
         } else if (!dni) {
-          // Si no tiene DNI, lo dejamos (podría ser un error de dato)
           seen.set(`nodni_${m.id}`, m);
         }
       });
       positivos = Array.from(seen.values());
 
-      // Filtro de búsqueda local con valor debounced
       if (debouncedSearch.trim()) {
         const q = debouncedSearch.toLowerCase();
         positivos = positivos.filter(m =>
@@ -86,12 +83,10 @@ export default function PositiveCases() {
         );
       }
 
-      // Filtro por BI-RADS
       if (filterBirads) {
         positivos = positivos.filter(m => extraerBirads(m.birads_mx) === filterBirads);
       }
 
-      // Filtro por Establecimiento
       if (filterEstablecimiento) {
         positivos = positivos.filter(m =>
           m.atencion?.establecimiento?.nombre === filterEstablecimiento
@@ -99,7 +94,6 @@ export default function PositiveCases() {
       }
 
       setTotal(positivos.length);
-      // Paginación local
       const from = (page - 1) * LIMIT;
       setCases(positivos.slice(from, from + LIMIT));
     } catch (err) {
@@ -109,7 +103,6 @@ export default function PositiveCases() {
     }
   };
 
-  // Debounce para búsqueda
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -136,6 +129,44 @@ export default function PositiveCases() {
 
   const totalPages = Math.ceil(total / LIMIT);
 
+  const handleExport = async () => {
+    try {
+      const filters = { soloPositivos: true };
+      if (debouncedSearch) filters.dni = debouncedSearch;
+      if (filterBirads) filters.birads_mx = filterBirads;
+
+      const res = await mammographyApi.export(filters);
+      let data = res.data;
+
+      data = data.filter(m => POSITIVOS_REGEX.test((m.birads_mx || '').trim()));
+
+      const headers = ['DNI', 'Paciente', 'Fecha', 'BI-RADS', 'Establecimiento', 'Teléfono', 'Resultado'];
+      const rows = data.map(m => [
+        m.atencion?.paciente?.dni,
+        m.atencion?.paciente?.nombres,
+        m.atencion?.fecha,
+        m.birads_mx,
+        m.atencion?.establecimiento?.nombre,
+        m.atencion?.paciente?.telefono,
+        m.resultados_mx?.replace(/,/g, ';')
+      ]);
+
+      const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `reporte_casos_positivos_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      alert('No se pudo generar la exportación');
+    }
+  };
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto min-h-screen">
       {/* Header */}
@@ -155,6 +186,13 @@ export default function PositiveCases() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-6 py-3.5 rounded-2xl font-bold shadow-sm transition-all active:scale-95"
+          >
+            <Download size={20} />
+            Exportar
+          </button>
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -191,7 +229,6 @@ export default function PositiveCases() {
       {/* Barra de filtros mejorada */}
       <div className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 mb-8 transition-colors duration-300">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {/* Buscador principal */}
           <div className="md:col-span-5 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -203,7 +240,6 @@ export default function PositiveCases() {
             />
           </div>
 
-          {/* Filtro BI-RADS */}
           <div className="md:col-span-3 relative">
             <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <select
@@ -218,7 +254,6 @@ export default function PositiveCases() {
             </select>
           </div>
 
-          {/* Filtro Establecimiento */}
           <div className="md:col-span-3 relative">
             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <select
@@ -233,7 +268,6 @@ export default function PositiveCases() {
             </select>
           </div>
 
-          {/* Botón limpiar */}
           <div className="md:col-span-1">
             <button
               onClick={() => {
@@ -251,7 +285,6 @@ export default function PositiveCases() {
         </div>
       </div>
 
-      {/* Tabla */}
       <div className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors duration-300">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
@@ -266,7 +299,7 @@ export default function PositiveCases() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -296,7 +329,6 @@ export default function PositiveCases() {
                         transition={{ delay: idx * 0.04 }}
                         className="hover:bg-rose-50/20 dark:hover:bg-rose-900/10 transition-colors group"
                       >
-                        {/* Paciente */}
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-4">
                             <div className="bg-rose-100 p-3 rounded-2xl group-hover:bg-rose-200 transition-colors">
@@ -313,7 +345,6 @@ export default function PositiveCases() {
                           </div>
                         </td>
 
-                        {/* BI-RADS */}
                         <td className="px-8 py-5">
                           <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border ${getBiradsStyle(m.birads_mx)}`}>
                             <Activity size={12} />
@@ -321,7 +352,6 @@ export default function PositiveCases() {
                           </span>
                         </td>
 
-                        {/* Establecimiento */}
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-bold">
                             <Building2 size={14} className="text-slate-300 shrink-0" />
@@ -331,7 +361,6 @@ export default function PositiveCases() {
                           </div>
                         </td>
 
-                        {/* Fecha */}
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 font-bold">
                             <Calendar size={14} className="text-slate-300" />
@@ -339,7 +368,6 @@ export default function PositiveCases() {
                           </div>
                         </td>
 
-                        {/* Contacto */}
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold">
                             <Phone size={14} className="text-slate-300" />
@@ -347,11 +375,22 @@ export default function PositiveCases() {
                           </div>
                         </td>
 
-                        {/* Resultado */}
                         <td className="px-8 py-5">
-                          <p className="text-xs text-slate-500 font-medium max-w-[200px] truncate">
-                            {m.resultados_mx || m.sugerencia_mx || '—'}
-                          </p>
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-xs text-slate-500 font-medium max-w-[200px] truncate">
+                              {m.resultados_mx || m.sugerencia_mx || '—'}
+                            </p>
+                            <button
+                              onClick={() => {
+                                setHistoryDni(m.atencion?.paciente?.dni);
+                                setIsHistoryOpen(true);
+                              }}
+                              title="Ver Historial"
+                              className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-100"
+                            >
+                              <History size={18} />
+                            </button>
+                          </div>
                         </td>
                       </motion.tr>
                     );
@@ -362,7 +401,6 @@ export default function PositiveCases() {
           </table>
         </div>
 
-        {/* Footer / Paginación */}
         <div className="px-8 py-6 bg-rose-50/30 dark:bg-slate-700/30 border-t border-rose-100 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-slate-400 font-black uppercase tracking-widest">
             {total} CASOS ÚNICOS POSITIVOS
@@ -390,6 +428,12 @@ export default function PositiveCases() {
           )}
         </div>
       </div>
+
+      <PatientHistoryModal
+        dni={historyDni}
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+      />
     </div>
   );
 }

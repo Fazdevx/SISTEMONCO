@@ -12,12 +12,18 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  if (Object.keys(req.query).length) console.log('Query:', req.query);
+  next();
+});
 
 // 2. Importación de Rutas
 const mammographyRoutes = require('./routes/mammographyRoutes');
 const userRoutes = require('./routes/userRoutes');
 const establishmentRoutes = require('./routes/establishmentRoutes');
 const importRoutes = require('./routes/importRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 // 3. Definición de Rutas
 app.get('/', (req, res) => {
@@ -28,6 +34,7 @@ app.use('/api/mammographies', mammographyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/microredes', establishmentRoutes);
 app.use('/api/establecimientos', establishmentRoutes);
+app.use('/api/patients', patientRoutes);
 app.use('/import', importRoutes);
 
 // 4. Manejo de Errores

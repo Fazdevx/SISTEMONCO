@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  LogOut, 
-  Settings, 
+import {
+  LayoutDashboard,
+  ClipboardList,
+  LogOut,
+  Settings,
   Users,
   User,
   Activity,
@@ -11,9 +11,10 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function Sidebar({ onLogout, user }) {
-  const isAdmin = true;
+export default function Sidebar({ onLogout }) {
+  const { user, perfil, isAdmin } = useAuth();
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -24,7 +25,7 @@ export default function Sidebar({ onLogout, user }) {
   ];
 
   return (
-    <aside className="w-72 bg-white dark:bg-slate-800 border-r border-slate-100 dark:border-slate-700 flex flex-col h-screen sticky top-0 z-50 transition-colors duration-300">
+    <aside className="w-72 bg-white dark:bg-slate-800 border-r rounded-r-4xl border-slate-100 dark:border-slate-700 flex flex-col h-screen sticky top-0 z-50 transition-colors duration-300">
       <div className="p-8">
         <div className="flex items-center gap-3">
           <div className="bg-accent p-2.5 rounded-2xl shadow-lg shadow-accent">
@@ -44,8 +45,8 @@ export default function Sidebar({ onLogout, user }) {
             to={item.path}
             className={({ isActive }) => `
               flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all duration-300 group
-              ${isActive 
-                ? 'bg-accent text-white shadow-xl shadow-accent font-bold' 
+              ${isActive
+                ? 'bg-accent text-white shadow-xl shadow-accent font-bold'
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-accent'}
             `}
           >
@@ -61,17 +62,21 @@ export default function Sidebar({ onLogout, user }) {
       <div className="p-6 mt-auto">
         <div className="bg-slate-50 dark:bg-slate-700/50 rounded-3xl p-5 mb-6">
           <div className="flex items-center gap-4">
-            <div className="bg-white dark:bg-slate-600 p-2 rounded-2xl shadow-sm text-accent">
+            <div className="bg-white dark:bg-slate-600 p-2 rounded-2xl shadow-sm text-accent shrink-0">
               <User size={20} />
             </div>
             <div className="overflow-hidden">
-              <p className="text-xs font-black text-slate-800 dark:text-white truncate uppercase">{user?.email?.split('@')[0]}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Administrador</p>
+              <p className="text-xs font-black text-slate-800 dark:text-white truncate uppercase">
+                {perfil?.nombres || user?.email?.split('@')[0]}
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                {perfil?.rol || 'Usuario'}
+              </p>
             </div>
           </div>
         </div>
-        
-        <button 
+
+        <button
           onClick={onLogout}
           className="w-full flex items-center justify-center gap-3 px-4 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl transition-all font-bold text-sm group"
         >

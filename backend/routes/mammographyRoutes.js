@@ -8,6 +8,7 @@ router.use(verifyToken);
 
 // 1. Rutas de Estadísticas (Deben ir antes de las rutas con :id)
 router.get('/stats/dashboard', mammographyController.getDashboardStats);
+router.get('/export', mammographyController.exportMammographies);
 
 // 2. Rutas CRUD
 router.get('/', mammographyController.listMammographies);

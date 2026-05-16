@@ -2,7 +2,8 @@ const supabase = require('../config/supabase');
 
 // Listar usuarios con sus perfiles y establecimientos
 const getUsers = async () => {
-  const { data, error } = await supabase
+  // 1. Obtener perfiles
+  const { data: profiles, error: profileError } = await supabase
     .from('perfiles')
     .select(`
       id,
@@ -14,8 +15,22 @@ const getUsers = async () => {
       establecimiento:establecimientos(nombre),
       microred:microredes(nombre)
     `);
-  if (error) throw error;
-  return data;
+  if (profileError) throw profileError;
+
+  // 2. Obtener usuarios de Auth para el email
+  const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
+  if (authError) throw authError;
+
+  // 3. Combinar datos
+  const combinedUsers = profiles.map(profile => {
+    const authUser = authUsers.find(u => u.id === profile.id);
+    return {
+      ...profile,
+      email: authUser?.email || 'S/N'
+    };
+  });
+
+  return combinedUsers;
 };
 
 // Crear un nuevo usuario (auth + perfil)
@@ -45,13 +60,15 @@ const createUser = async (email, password, nombres, rol, establecimiento_id, mic
 
 // Actualizar perfil de usuario
 const updateUser = async (userId, updateData) => {
-  const { nombres, rol, establecimiento_id, microred_id, password } = updateData;
+  const { email, nombres, rol, establecimiento_id, microred_id, password } = updateData;
 
-  // 1. Si viene password, actualizar en Auth
-  if (password) {
-    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
-      password: password
-    });
+  // 1. Actualizar datos en Auth (email y/o password)
+  const authUpdates = {};
+  if (email) authUpdates.email = email;
+  if (password) authUpdates.password = password;
+
+  if (Object.keys(authUpdates).length > 0) {
+    const { error: authError } = await supabase.auth.admin.updateUserById(userId, authUpdates);
     if (authError) throw authError;
   }
 
@@ -80,4 +97,39 @@ const deleteUser = async (userId) => {
   return { success: true };
 };
 
-module.exports = { getUsers, createUser, updateUser, deleteUser };
+// Obtener un usuario por ID
+const getUser = async (userId) => {
+  // 1. Obtener perfil
+  const { data: profile, error: profileError } = await supabase
+    .from('perfiles')
+    .select(`
+      id,
+      nombres,
+      rol,
+      establecimiento_id,
+      microred_id,
+      created_at,
+      establecimiento:establecimientos(nombre),
+      microred:microredes(nombre)
+    `)
+    .eq('id', userId)
+    .single();
+  if (profileError) throw profileError;
+
+  // 2. Obtener email de Auth
+  const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(userId);
+  if (authError) throw authError;
+
+  const response = {
+    ...profile,
+    email: authUser?.email || 'S/N'
+  };
+
+  console.log('--- GET USER BY ID ---');
+  console.log('ID:', userId);
+  console.log('Datos encontrados:', response);
+
+  return response;
+};
+
+module.exports = { getUsers, getUser, createUser, updateUser, deleteUser };
