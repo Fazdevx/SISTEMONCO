@@ -45,11 +45,31 @@ const createUser = async (email, password, nombres, rol, establecimiento_id, mic
 
 // Actualizar perfil de usuario
 const updateUser = async (userId, updateData) => {
-  const { error } = await supabase
-    .from('perfiles')
-    .update(updateData)
-    .eq('id', userId);
-  if (error) throw error;
+  const { nombres, rol, establecimiento_id, microred_id, password } = updateData;
+
+  // 1. Si viene password, actualizar en Auth
+  if (password) {
+    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+      password: password
+    });
+    if (authError) throw authError;
+  }
+
+  // 2. Actualizar datos del perfil
+  const profileUpdates = {};
+  if (nombres !== undefined) profileUpdates.nombres = nombres;
+  if (rol !== undefined) profileUpdates.rol = rol;
+  if (establecimiento_id !== undefined) profileUpdates.establecimiento_id = establecimiento_id || null;
+  if (microred_id !== undefined) profileUpdates.microred_id = microred_id || null;
+
+  if (Object.keys(profileUpdates).length > 0) {
+    const { error } = await supabase
+      .from('perfiles')
+      .update(profileUpdates)
+      .eq('id', userId);
+    if (error) throw error;
+  }
+
   return { success: true };
 };
 

@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import UserModal from '../components/UserModal';
 
 export default function UserList() {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,6 +56,9 @@ export default function UserList() {
   }, []);
 
   const filteredUsers = users.filter(u => {
+    // No mostrar el usuario actual en la lista
+    if (u.id === user?.id) return false;
+
     const matchesSearch = !search ||
       u.nombres?.toLowerCase().includes(search.toLowerCase()) ||
       u.auth_user?.email?.toLowerCase().includes(search.toLowerCase());

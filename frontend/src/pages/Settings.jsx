@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { userApi } from '../../services/api';
 
 export default function Settings() {
   const { user, profile } = useAuth();
@@ -73,15 +74,10 @@ export default function Settings() {
     setMessage({ type: '', text: '' });
 
     try {
-      const { error } = await supabase
-        .from('perfiles')
-        .update({ nombres: profileData.nombres })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await userApi.update(user.id, { nombres: profileData.nombres });
       setMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
     } catch (error) {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
     } finally {
       setLoading(false);
     }
@@ -95,15 +91,11 @@ export default function Settings() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
-      });
-
-      if (error) throw error;
+      await userApi.update(user.id, { password: passwordData.newPassword });
       setMessage({ type: 'success', text: 'Contraseña actualizada con éxito' });
       setPasswordData({ newPassword: '', confirmPassword: '' });
     } catch (error) {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
     } finally {
       setLoading(false);
     }
