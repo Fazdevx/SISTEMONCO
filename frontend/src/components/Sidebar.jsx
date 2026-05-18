@@ -25,7 +25,7 @@ export default function Sidebar({ onLogout }) {
   ];
 
   return (
-    <aside className="w-72 bg-white dark:bg-slate-800 border-r rounded-r-4xl border-slate-100 dark:border-slate-700 flex flex-col h-screen sticky top-0 z-50 transition-colors duration-300">
+    <aside className="w-64 bg-white dark:bg-slate-800 border-r rounded-r-4xl border-slate-100 dark:border-slate-700 flex flex-col h-screen sticky top-0 z-50 transition-colors duration-300">
       <div className="p-8">
         <div className="flex items-center gap-3">
           <div className="bg-accent p-2.5 rounded-2xl shadow-lg shadow-accent">

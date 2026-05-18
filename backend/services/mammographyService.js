@@ -234,28 +234,49 @@ const getDashboardStats = async () => {
   if (err5) throw err5;
   const distribucionBirads = {};
   biradsDist.forEach(row => {
-    const raw = row.birads_mx || '';
-    // Extraer el valor después de 'BI-RADS ' o usar el raw si ya es solo un número
-    const match = raw.match(/BI-RADS\s*(.+)/i);
-    const b = match ? match[1].trim() : (raw.trim() || 'SIN ESPECIFICAR');
-    distribucionBirads[b] = (distribucionBirads[b] || 0) + 1;
+    let raw = (row.birads_mx || '').trim().toUpperCase();
+    if (!raw) {
+      distribucionBirads['SIN ESPECIFICAR'] = (distribucionBirads['SIN ESPECIFICAR'] || 0) + 1;
+      return;
+    }
+    // Normalizar etiquetas comunes
+    let label = raw;
+    const match = raw.match(/BI-RADS\s*[:\s]*([0-6][ABC]?)/i);
+    if (match) {
+      label = `BI-RADS ${match[1]}`;
+    } else if (/^[0-6][ABC]?$/.test(raw)) {
+      label = `BI-RADS ${raw}`;
+    }
+    
+    distribucionBirads[label] = (distribucionBirads[label] || 0) + 1;
   });
 
-  // Top 5 establecimientos
-  const { data: atencionesPorEst, error: err6 } = await supabase
-    .from('atenciones')
-    .select('establecimiento:establecimientos(nombre)')
-    .not('establecimiento_id', 'is', null);
+  // Obtener TODOS los establecimientos para cruzar con atenciones
+  const { data: allEstsDB, error: err6 } = await supabase
+    .from('establecimientos')
+    .select('id, nombre, meta_anual');
   if (err6) throw err6;
-  const establecimientosCount = {};
-  atencionesPorEst.forEach(row => {
-    const nombre = row.establecimiento?.nombre || 'Sin establecer';
-    establecimientosCount[nombre] = (establecimientosCount[nombre] || 0) + 1;
+
+  // Contar atenciones por establecimiento
+  const { data: counts, error: err7 } = await supabase
+    .from('atenciones')
+    .select('establecimiento_id');
+  if (err7) throw err7;
+
+  const atencionesMap = {};
+  counts.forEach(c => {
+    if (c.establecimiento_id) {
+      atencionesMap[c.establecimiento_id] = (atencionesMap[c.establecimiento_id] || 0) + 1;
+    }
   });
-  const topEstablecimientos = Object.entries(establecimientosCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([nombre, cantidad]) => ({ nombre, cantidad }));
+
+  const allEstablecimientos = allEstsDB.map(est => ({
+    nombre: est.nombre,
+    cantidad: atencionesMap[est.id] || 0,
+    meta: est.meta_anual || 0
+  })).sort((a, b) => b.cantidad - a.cantidad);
+
+  const topEstablecimientos = allEstablecimientos.slice(0, 5);
 
   return {
     totalAtenciones,
@@ -264,7 +285,8 @@ const getDashboardStats = async () => {
     porcentajePositivas,
     atencionesPorMes: atencionesPorMesArray,
     distribucionBirads,
-    topEstablecimientos
+    topEstablecimientos,
+    allEstablecimientos
   };
 };
 

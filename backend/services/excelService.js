@@ -24,7 +24,8 @@ const {
 const {
   loadEstablishmentsCache,
   getEstablishmentId,
-  getAllEstablishmentNames
+  getAllEstablishmentNames,
+  updateEstablishmentMeta
 } = require('./establishmentService');
 const { detectColumnMapping, getField } = require('../utils/excelHelpers');
 
@@ -32,6 +33,7 @@ const { detectColumnMapping, getField } = require('../utils/excelHelpers');
 // SOLO PROCESAR HOJAS QUE REALMENTE TIENEN DATOS
 // =============================================
 const VALID_SHEETS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY']; // Agrega más si tienen estructura similar
+const META_SHEET = 'METAS Y AVANCES 2026';
 const BATCH_SIZE = 100;
 
 const processMammographyExcel = async () => {
@@ -40,13 +42,26 @@ const processMammographyExcel = async () => {
   console.log('📂 Cargando establecimientos...');
   await loadEstablishmentsCache();
 
-  if (getAllEstablishmentNames) {
-    const establecimientosEnCache = getAllEstablishmentNames();
-    console.log('🏥 Establecimientos en caché:', establecimientosEnCache);
-    console.log('📊 Total establecimientos:', establecimientosEnCache.length);
+  const workbook = XLSX.readFile(`./uploads/${FILE_NAME}`);
+
+  // 🎯 IMPORTAR METAS PRIMERO
+  if (workbook.SheetNames.includes(META_SHEET)) {
+    console.log(`\n🎯 Procesando hoja de metas: ${META_SHEET}`);
+    const metaSheet = workbook.Sheets[META_SHEET];
+    const metaRows = XLSX.utils.sheet_to_json(metaSheet);
+    let metasActualizadas = 0;
+
+    for (const row of metaRows) {
+      const nombreEst = row['ESTABLECIMIENTO DE SALUD'];
+      const metaAnual = row['META ANUAL'];
+      if (nombreEst && metaAnual) {
+        const ok = await updateEstablishmentMeta(nombreEst, parseInt(metaAnual));
+        if (ok) metasActualizadas++;
+      }
+    }
+    console.log(`✅ Metas actualizadas para ${metasActualizadas} establecimientos.`);
   }
 
-  const workbook = XLSX.readFile(`./uploads/${FILE_NAME}`);
   const sheetsToProcess = workbook.SheetNames.filter(sheet =>
     VALID_SHEETS.includes(sheet.toUpperCase())
   );

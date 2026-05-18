@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { mammographyApi } from '../../services/api';
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement, 
-  Title, 
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
   PointElement,
   LineElement,
   ArcElement,
@@ -13,17 +13,18 @@ import {
   Tooltip as ChartTooltip
 } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
-import { 
-  Users, 
-  ClipboardList, 
-  AlertCircle, 
-  TrendingUp, 
-  Calendar,
+import {
+  Users,
+  ClipboardList,
+  AlertCircle,
+  TrendingUp,
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
+import AllEstablishmentsModal from '../components/AllEstablishmentsModal';
 
 ChartJS.register(
   CategoryScale,
@@ -38,7 +39,7 @@ ChartJS.register(
 );
 
 const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
-  <motion.div 
+  <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-start justify-between hover:shadow-md transition-all duration-300"
@@ -58,11 +59,11 @@ const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
   </motion.div>
 );
 
-
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { isDark } = useTheme();
 
   useEffect(() => {
@@ -79,7 +80,6 @@ export default function Dashboard() {
     };
     fetchStats();
   }, []);
-
 
   if (loading) return (
     <div className="flex h-[80vh] items-center justify-center">
@@ -136,7 +136,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8 p-6 lg:p-10 max-w-7xl mx-auto">
+    <div className="space-y-8 p-6  max-w-7xl mx-auto">
       <header className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">Panel de Control</h1>
@@ -149,24 +149,24 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard 
-          title="Atenciones Totales" 
-          value={stats.totalAtenciones} 
-          icon={ClipboardList} 
-          color="bg-accent" 
+        <StatCard
+          title="Atenciones Totales"
+          value={stats.totalAtenciones}
+          icon={ClipboardList}
+          color="bg-accent"
         />
-        <StatCard 
-          title="Pacientes Únicos" 
-          value={stats.totalPacientes} 
-          icon={Users} 
-          color="bg-emerald-600" 
+        <StatCard
+          title="Pacientes Únicos"
+          value={stats.totalPacientes}
+          icon={Users}
+          color="bg-emerald-600"
         />
-        <StatCard 
-          title="Resultados Positivos" 
-          value={stats.totalPositivas} 
+        <StatCard
+          title="Resultados Positivos"
+          value={stats.totalPositivas}
           percentage={stats.porcentajePositivas}
-          icon={AlertCircle} 
-          color="bg-rose-600" 
+          icon={AlertCircle}
+          color="bg-rose-600"
         />
       </div>
 
@@ -189,7 +189,7 @@ export default function Dashboard() {
             Distribución BI-RADS
           </h3>
           <div className="h-[300px] flex items-center justify-center">
-            <Doughnut data={biradsData} options={{ 
+            <Doughnut data={biradsData} options={{
               maintainAspectRatio: false,
               cutout: '70%',
               plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20, color: textColor } } }
@@ -200,29 +200,70 @@ export default function Dashboard() {
 
       {/* Top Establecimientos */}
       <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
-        <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-8">
-          <Building2 size={18} className="text-slate-500 dark:text-slate-400" />
-          Productividad por Establecimiento (Top 5)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-          {stats.topEstablecimientos.map((est, idx) => (
-            <div key={idx} className="relative">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{est.nombre}</span>
-                <span className="text-sm font-black text-accent">{est.cantidad}</span>
+        <div className="flex justify-between items-center mb-8">
+          <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Building2 size={18} className="text-slate-500 dark:text-slate-400" />
+            Productividad vs Metas (Top 5)
+          </h3>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="text-accent hover:text-accent-hover text-sm font-bold flex items-center gap-1 transition-colors px-4 py-2 rounded-xl hover:bg-accent/5"
+          >
+            Ver más <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+          {stats.topEstablecimientos.map((est, idx) => {
+            const hasMeta = est.meta > 0;
+            const percentage = hasMeta ? Math.min((est.cantidad / est.meta) * 100, 100) : (est.cantidad / stats.totalAtenciones) * 100;
+            const progressColor = hasMeta ? (percentage >= 100 ? 'bg-emerald-500' : 'bg-accent') : 'bg-slate-400';
+
+            return (
+              <div key={idx} className="relative group">
+                <div className="flex justify-between items-end mb-2">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-accent transition-colors">
+                      {est.nombre}
+                    </span>
+                    {hasMeta && (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        Meta: {est.meta} tamizajes
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-black text-slate-800 dark:text-white leading-none">
+                      {est.cantidad}
+                    </span>
+                    {hasMeta && (
+                      <span className={`text-[10px] font-bold ${percentage >= 100 ? 'text-emerald-500' : 'text-accent'}`}>
+                        {percentage.toFixed(1)}% de la meta
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-4 overflow-hidden p-0.5 border border-slate-200/50 dark:border-slate-600/50">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ duration: 1.2, ease: "easeOut", delay: idx * 0.1 }}
+                    className={`${progressColor} h-full rounded-full shadow-sm relative`}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse-slow"></div>
+                  </motion.div>
+                </div>
               </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(est.cantidad / stats.totalAtenciones) * 100}%` }}
-                  transition={{ duration: 1, delay: idx * 0.1 }}
-                  className="bg-accent h-3 rounded-full" 
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      <AllEstablishmentsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        establishments={stats.allEstablecimientos}
+        totalAtenciones={stats.totalAtenciones}
+      />
     </div>
   );
 }

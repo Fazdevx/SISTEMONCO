@@ -90,11 +90,39 @@ const getAllEstablishmentNames = () => {
   return Array.from(establishmentCache.keys());
 };
 
+const updateEstablishmentMeta = async (nombreFromExcel, metaAnual) => {
+  const normalizedName = normalizeEstablishmentName(nombreFromExcel);
+  
+  // Buscar el ID en cache
+  let establishmentId = null;
+  for (let [dbName, id] of establishmentCache.entries()) {
+    if (dbName.toLowerCase() === normalizedName.toLowerCase()) {
+      establishmentId = id;
+      break;
+    }
+  }
+
+  if (!establishmentId) return null;
+
+  const { error } = await supabase
+    .from('establecimientos')
+    .update({ meta_anual: metaAnual })
+    .eq('id', establishmentId);
+
+  if (error) {
+    console.error(`❌ Error actualizando meta para ${nombreFromExcel}:`, error.message);
+    return false;
+  }
+  
+  return true;
+};
+
 module.exports = {
   loadEstablishmentsCache,
   getEstablishmentId,
   getAllEstablishmentNames,
   establishmentCache,
   normalizeEstablishmentName,
-  ESTABLISHMENT_MAPPING
+  ESTABLISHMENT_MAPPING,
+  updateEstablishmentMeta
 };
