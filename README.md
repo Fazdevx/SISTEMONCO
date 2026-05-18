@@ -1,93 +1,105 @@
-# SISTEMONCO - Sistema de Monitoreo Oncológico
+# <p align="center">🏥 SISTEMONCO</p>
 
-SISTEMONCO es una plataforma integral diseñada para la gestión, seguimiento y análisis de tamizajes de mamografía. Permite a los profesionales de salud realizar un seguimiento detallado de las pacientes, gestionar resultados (BI-RADS), y automatizar la importación de datos desde reportes de Excel.
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen" alt="Status">
+  <img src="https://img.shields.io/badge/Version-1.0.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/License-ISC-orange" alt="License">
+  <img src="https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-339933" alt="Backend">
+  <img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Tailwind-61DAFB" alt="Frontend">
+  <img src="https://img.shields.io/badge/Database-Supabase%20%7C%20PostgreSQL-3ECF8E" alt="Database">
+</p>
 
-## 🚀 Tecnologías
+---
 
-### Frontend
-- **React 19**: Biblioteca principal para la interfaz de usuario.
-- **Vite**: Herramienta de construcción rápida.
-- **Tailwind CSS 4**: Framework de estilos para un diseño moderno y responsivo.
-- **Framer Motion**: Animaciones fluidas en la interfaz.
-- **Lucide React**: Set de iconos consistentes.
-- **Chart.js**: Visualización de estadísticas y métricas en el dashboard.
-- **React Router Dom 7**: Gestión de navegación y rutas protegidas.
+## 🌟 Descripción General
 
-### Backend
-- **Node.js & Express 5**: Entorno de ejecución y framework para la API REST.
-- **Supabase**: Backend-as-a-Service para la base de datos PostgreSQL y autenticación.
-- **XLSX (SheetJS)**: Procesamiento y normalización de archivos Excel complejos.
-- **Dotenv**: Gestión de variables de entorno.
+**SISTEMONCO** es una solución "Full-Stack" de alto rendimiento diseñada para la **gestión, monitoreo y análisis oncológico**. El sistema optimiza el flujo de trabajo clínico permitiendo el seguimiento preciso de tamizajes de mamografía, la gestión de resultados críticos (BI-RADS) y la automatización inteligente de datos masivos.
 
-## 🛠️ Estructura del Proyecto
+> [!IMPORTANT]
+> Diseñado específicamente para reducir la brecha entre la captura de datos manual y el análisis clínico oportuno.
 
-```text
+---
+
+## 🛠️ Tech Stack & Arquitectura
+
+### 💻 Frontend (The "Eye")
+| Componente | Tecnología | Propósito |
+| :--- | :--- | :--- |
+| **UI Framework** | React 19 + Vite | Renderizado ultra-rápido y DX superior. |
+| **Styling** | Tailwind CSS 4 | Diseño atómico y responsivo. |
+| **Animations** | Framer Motion | Feedback visual y transiciones fluidas. |
+| **Charts** | Chart.js | Visualización de KPIs y tendencias. |
+| **Icons** | Lucide React | Iconografía vectorial moderna. |
+
+### ⚙️ Backend (The "Brain")
+- **Core:** Node.js v18+ & Express 5 (Next-gen routing).
+- **Database & Auth:** Supabase (PostgreSQL) para integridad referencial y seguridad robusta.
+- **Data Engine:** XLSX (SheetJS) con algoritmos de normalización personalizados.
+- **Real-time:** WebSockets (ws) para sincronización de procesos pesados.
+
+---
+
+## 📂 Estructura del Ecosistema
+
+```bash
 SISTEMONCO/
-├── backend/            # API REST, servicios de importación y lógica de negocio
-│   ├── config/         # Configuración de base de datos (Supabase)
-│   ├── controllers/    # Controladores de las rutas
-│   ├── routes/         # Definición de endpoints
-│   ├── services/       # Lógica compleja (Excel, normalización, DB)
-│   └── utils/          # Helpers y validadores
-├── frontend/           # Aplicación Single Page Application (SPA)
-│   ├── src/
-│   │   ├── components/ # Componentes reutilizables
-│   │   ├── contexts/   # Estados globales (Auth, Theme)
-│   │   ├── pages/      # Vistas principales de la aplicación
-│   │   └── services/   # Clientes de API
-└── uploads/            # Almacenamiento temporal para archivos de importación
+├── 🚀 backend/           # Lógica de API & Data Processing
+│   ├── 🛠️ config/        # Supabase client & settings
+│   ├── 🎮 controllers/   # Request handlers
+│   ├── 🛤️ routes/        # Endpoint definitions
+│   ├── 🧠 services/      # Business logic (Excel Engine, DB Services)
+│   └── 🔧 utils/         # Validators, Normalizers & Loggers
+├── 🎨 frontend/          # SPA (Single Page Application)
+│   ├── 🧩 components/    # Reusable UI Blocks
+│   ├── 🧪 contexts/      # Global State Management
+│   └── 📖 pages/         # View compositions
+└── 📁 uploads/           # Buffer para archivos .xlsx
 ```
 
-## ⚙️ Configuración e Instalación
+---
 
-### Requisitos Previos
-- Node.js (v18 o superior)
-- Cuenta en Supabase con las tablas configuradas.
+## 🚦 Guía de Inicio Rápido
 
-### Pasos
+### 1️⃣ Clonación y Dependencias
+```bash
+# Clonar el core
+git clone <repo-url>
+cd SISTEMONCO
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone <url-del-repositorio>
-   cd SISTEMONCO
-   ```
+# Levantar el cerebro (Backend)
+cd backend && npm install
 
-2. **Configurar el Backend:**
-   ```bash
-   cd backend
-   npm install
-   ```
-   Crea un archivo `.env` en `backend/` con las siguientes variables:
-   ```env
-   PORT=3000
-   SUPABASE_URL=tu_url_de_supabase
-   SUPABASE_KEY=tu_anon_key_de_supabase
-   ```
+# Levantar la vista (Frontend)
+cd ../frontend && npm install
+```
 
-3. **Configurar el Frontend:**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-   Crea un archivo `.env` en `frontend/` con las siguientes variables:
-   ```env
-   VITE_SUPABASE_URL=tu_url_de_supabase
-   VITE_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
-   VITE_API_URL=http://localhost:3000
-   ```
+### 2️⃣ Variables de Entorno (.env)
+Configura los archivos `.env` en sus respectivas carpetas:
 
-4. **Ejecutar el proyecto:**
-   - **Backend:** `npm start` (o `node server.js`)
-   - **Frontend:** `npm run dev`
+**Backend:**
+```ini
+PORT=3000
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_service_role_key
+```
 
-## 📊 Funcionalidades Clave
+**Frontend:**
+```ini
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_API_URL=http://localhost:3000
+```
 
-- **Dashboard Estadístico:** Visualización en tiempo real de tamizajes realizados y casos positivos.
-- **Gestión de Mamografías:** Listado exhaustivo con filtros por establecimiento, resultado y estado.
-- **Seguimiento de Casos Positivos:** Módulo especializado para pacientes con BI-RADS 4 y 5.
-- **Importación Inteligente:** Motor de procesamiento de Excel que normaliza datos, detecta duplicados y mapea columnas automáticamente.
-- **Gestión de Usuarios:** Control de acceso para administradores y personal de salud.
-- **Modo Oscuro/Claro:** Interfaz adaptable a las preferencias del usuario.
+---
 
-## 📄 Licencia
-Este proyecto está bajo la Licencia ISC.
+## 🚀 Funcionalidades Elite
+
+- **⚡ Excel Smart-Import:** Motor que mapea columnas automáticamente, normaliza DNI/Nombres y detecta colisiones de datos.
+- **📊 Dashboard Biométrico:** Resumen ejecutivo de tamizajes, tasas de positividad y metas mensuales.
+- **🎯 Tracking BI-RADS:** Sistema de alerta temprana para casos 4 y 5 con flujo de referencia directo.
+- **🌓 Adaptive UI:** Soporte nativo para Modo Oscuro/Claro basado en preferencias de sistema.
+
+---
+
+## 📜 Licencia
+Distribuido bajo la licencia **ISC**. © 2026 **SISTEMONCO Team**.
