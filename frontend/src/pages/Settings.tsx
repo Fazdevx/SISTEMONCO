@@ -299,7 +299,14 @@ export default function Settings() {
                     {[
                       { id: 'indigo', color: 'bg-[#4f46e5]', label: 'Índigo' },
                       { id: 'emerald', color: 'bg-[#059669]', label: 'Esmeralda' },
-                      { id: 'rose', color: 'bg-[#e11d48]', label: 'Rosa' }
+                      { id: 'rose', color: 'bg-[#e11d48]', label: 'Rosa' },
+                      { id: 'blue', color: 'bg-[#3b82f6]', label: 'Azul' },
+                      { id: 'sky', color: 'bg-[#0ea5e9]', label: 'Celeste' },
+                      { id: 'purple', color: 'bg-[#7c3aed]', label: 'Morado' },
+                      { id: 'pink', color: 'bg-[#ec4899]', label: 'Rosa Fuerte' },
+                      { id: 'teal', color: 'bg-[#0d9488]', label: 'Teal' },
+                      { id: 'lime', color: 'bg-[#84cc16]', label: 'Lima' },
+                      { id: 'amber', color: 'bg-[#f59e0b]', label: 'Ámbar' }
                     ].map(c => (
                       <button
                         key={c.id}

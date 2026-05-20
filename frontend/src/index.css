@@ -29,6 +29,55 @@
     --accent-shadow: rgba(225, 29, 72, 0.2);
   }
 
+  :root[data-accent="blue"] {
+    --accent-primary: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-soft: rgba(59, 130, 246, 0.1);
+    --accent-shadow: rgba(59, 130, 246, 0.2);
+  }
+
+  :root[data-accent="sky"] {
+    --accent-primary: #0ea5e9;
+    --accent-hover: #0284c7;
+    --accent-soft: rgba(14, 165, 233, 0.1);
+    --accent-shadow: rgba(14, 165, 233, 0.2);
+  }
+
+  :root[data-accent="purple"] {
+    --accent-primary: #7c3aed;
+    --accent-hover: #6d28d9;
+    --accent-soft: rgba(124, 58, 237, 0.1);
+    --accent-shadow: rgba(124, 58, 237, 0.2);
+  }
+
+  :root[data-accent="pink"] {
+    --accent-primary: #ec4899;
+    --accent-hover: #db2777;
+    --accent-soft: rgba(236, 72, 153, 0.1);
+    --accent-shadow: rgba(236, 72, 153, 0.2);
+  }
+
+  :root[data-accent="teal"] {
+    --accent-primary: #0d9488;
+    --accent-hover: #0f766e;
+    --accent-soft: rgba(13, 148, 136, 0.1);
+    --accent-shadow: rgba(13, 148, 136, 0.2);
+  }
+
+  :root[data-accent="lime"] {
+    --accent-primary: #84cc16;
+    --accent-hover: #65a30d;
+    --accent-soft: rgba(132, 204, 22, 0.1);
+    --accent-shadow: rgba(132, 204, 22, 0.2);
+  }
+
+  :root[data-accent="amber"] {
+    --accent-primary: #f59e0b;
+    --accent-hover: #d97706;
+    --accent-soft: rgba(245, 158, 11, 0.1);
+    --accent-shadow: rgba(245, 158, 11, 0.2);
+  }
+
   .bg-accent { background-color: var(--accent-primary) !important; }
   .bg-accent-hover:hover { background-color: var(--accent-hover) !important; }
   .text-accent { color: var(--accent-primary) !important; }
