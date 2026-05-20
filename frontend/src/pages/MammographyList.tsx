@@ -22,24 +22,34 @@ import { mammographyApi, establishmentApi } from '../../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import MammographyModal from '../components/MammographyModal';
 import PatientHistoryModal from '../components/PatientHistoryModal';
+import { Mamografia } from '../types';
+import { useMammographiesList, useMutateMammography } from '../hooks/queries/useMammographies';
+import { useEstablecimientos } from '../hooks/queries/useEstablishments';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 export default function MammographyList() {
-  const { isAdmin } = useAuth();
-  const [mammographies, setMammographies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { isAdmin, perfil } = useAuth();
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBirads, setFilterBirads] = useState('');
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
-  const [establecimientos, setEstablecimientos] = useState([]);
 
   // Historial Paciente
-  const [historyDni, setHistoryDni] = useState(null);
+  const [historyDni, setHistoryDni] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  const { data: establecimientos = [] } = useEstablecimientos();
+
+  // Establecer filtro inicial si no es admin
+  useEffect(() => {
+    if (!isAdmin && perfil?.establecimiento_id) {
+      setFilterEstablecimiento(perfil.establecimiento_id);
+    }
+  }, [isAdmin, perfil]);
 
   // Lógica de Debounce para búsqueda
   useEffect(() => {
@@ -50,45 +60,26 @@ export default function MammographyList() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    const fetchMammographies = async () => {
-      setLoading(true);
-      try {
-        const filters = {};
-        if (debouncedSearch) filters.dni = debouncedSearch;
-        if (filterBirads) filters.birads_mx = filterBirads;
-        if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
+  const apiFilters = useMemo(() => {
+    const filters: any = {};
+    if (debouncedSearch) filters.dni = debouncedSearch;
+    if (filterBirads) filters.birads_mx = filterBirads;
+    if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
+    return filters;
+  }, [debouncedSearch, filterBirads, filterEstablecimiento]);
 
-        const res = await mammographyApi.getAll(page, 10, filters);
-        setMammographies(res.data.data);
-        setTotal(res.data.total);
-      } catch (error) {
-        console.error('Error al cargar:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMammographies();
-  }, [page, debouncedSearch, filterBirads, filterEstablecimiento]);
+  const { data, isLoading: loading } = useMammographiesList(page, 10, apiFilters);
+  const mammographies = data?.data || [];
+  const total = data?.total || 0;
 
-  useEffect(() => {
-    const loadEstablecimientos = async () => {
-      try {
-        const res = await establishmentApi.getEstablecimientos();
-        setEstablecimientos(res.data || []);
-      } catch (err) {
-        console.error('Error:', err);
-      }
-    };
-    loadEstablecimientos();
-  }, []);
+  const queryClient = useQueryClient();
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string | number) => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
     try {
       await mammographyApi.delete(id);
-      setMammographies(prev => prev.filter(m => m.id !== id));
-      setTotal(prev => prev - 1);
+      queryClient.invalidateQueries({ queryKey: ['mammographies'] });
+      queryClient.invalidateQueries({ queryKey: ['mammographyStats'] });
     } catch (error) {
       console.error('Error al eliminar:', error);
       alert('No se pudo eliminar el registro');
@@ -99,16 +90,16 @@ export default function MammographyList() {
 
   const handleExport = async () => {
     try {
-      const filters = {};
+      const filters: any = {};
       if (debouncedSearch) filters.dni = debouncedSearch;
       if (filterBirads) filters.birads_mx = filterBirads;
       if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
 
       const res = await mammographyApi.export(filters);
-      const data = res.data;
+      const data: Mamografia[] = res.data;
 
       const headers = ['DNI', 'Paciente', 'Fecha', 'BI-RADS', 'Establecimiento', 'Resultado', 'Sugerencia'];
-      const rows = data.map(m => [
+      const rows = data.map((m: Mamografia) => [
         m.atencion?.paciente?.dni,
         m.atencion?.paciente?.nombres,
         m.atencion?.fecha,
@@ -195,9 +186,10 @@ export default function MammographyList() {
             <select
               value={filterEstablecimiento}
               onChange={(e) => { setFilterEstablecimiento(e.target.value); setPage(1); }}
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all text-sm font-bold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+              disabled={!isAdmin}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all text-sm font-bold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <option value="">Todas las Sedes</option>
+              <option value="">{isAdmin ? 'Todas las Sedes' : 'Mi Sede'}</option>
               {establecimientos.map(est => (
                 <option key={est.id} value={est.id}>{est.nombre}</option>
               ))}
@@ -209,7 +201,7 @@ export default function MammographyList() {
               onClick={() => {
                 setSearch('');
                 setFilterBirads('');
-                setFilterEstablecimiento('');
+                if (isAdmin) setFilterEstablecimiento('');
                 setPage(1);
               }}
               title="Limpiar filtros"
@@ -238,13 +230,13 @@ export default function MammographyList() {
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td className="px-8 py-8" colSpan="5">
+                      <td className="px-8 py-8" colSpan={5}>
                         <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded-full w-full opacity-50"></div>
                       </td>
                     </tr>
                   ))
                 ) : (
-                  mammographies.map((m) => (
+                  mammographies.map((m: Mamografia) => (
                     <motion.tr
                       key={m.id}
                       initial={{ opacity: 0 }}

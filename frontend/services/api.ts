@@ -23,7 +23,8 @@ api.interceptors.request.use(async (config) => {
 
 export const mammographyApi = {
   getAll: (page = 1, limit = 10, filters = {}) => {
-    const params = new URLSearchParams({ page, limit, ...filters });
+    const stringFilters = Object.entries(filters).reduce((acc: any, [k, v]) => ({ ...acc, [k]: String(v) }), {});
+    const params = new URLSearchParams({ page: String(page), limit: String(limit), ...stringFilters });
     return api.get(`/mammographies?${params.toString()}`);
   },
   getById: (id) => api.get(`/mammographies/${id}`),
@@ -32,7 +33,8 @@ export const mammographyApi = {
   delete: (id) => api.delete(`/mammographies/${id}`),
   getStats: () => api.get('/mammographies/stats/dashboard'),
   export: (filters = {}) => {
-    const params = new URLSearchParams({ ...filters });
+    const stringFilters = Object.entries(filters).reduce((acc: any, [k, v]) => ({ ...acc, [k]: String(v) }), {});
+    const params = new URLSearchParams(stringFilters);
     return api.get(`/mammographies/export?${params.toString()}`);
   },
 };

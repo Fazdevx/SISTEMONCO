@@ -9,6 +9,16 @@ const getMicroredes = async (req, res) => {
 
 const getEstablecimientos = async (req, res) => {
   let query = supabase.from('establecimientos').select('*, microred:microredes(nombre)').order('nombre');
+  
+  // Si no es admin, filtrar por el establecimiento del usuario
+  if (req.user.rol !== 'admin') {
+    if (req.user.rol === 'establecimiento') {
+      query = query.eq('id', req.user.establecimiento_id);
+    } else if (req.user.rol === 'microred') {
+      query = query.eq('microred_id', req.user.microred_id);
+    }
+  }
+
   if (req.query.microred_id) {
     query = query.eq('microred_id', req.query.microred_id);
   }

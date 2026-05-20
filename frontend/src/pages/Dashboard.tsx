@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { mammographyApi } from '../../services/api';
+// @ts-nocheck
+import { useState } from 'react';
+import { useMammographyStats } from '../hooks/queries/useMammographies';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,7 +11,8 @@ import {
   LineElement,
   ArcElement,
   Legend,
-  Tooltip as ChartTooltip
+  Tooltip as ChartTooltip,
+  Filler
 } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -20,11 +22,13 @@ import {
   TrendingUp,
   Building2,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  CalendarDays
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import AllEstablishmentsModal from '../components/AllEstablishmentsModal';
+import { getProgressColor, getProgressTextColor } from '../utils/colors';
 
 ChartJS.register(
   CategoryScale,
@@ -35,7 +39,8 @@ ChartJS.register(
   ArcElement,
   Title,
   ChartTooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
@@ -60,26 +65,9 @@ const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
 );
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: stats, isLoading: loading, error } = useMammographyStats();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isDark } = useTheme();
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await mammographyApi.getStats();
-        setStats(res.data);
-      } catch (err) {
-        console.error(err);
-        setError('Error al cargar estadísticas');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
 
   if (loading) return (
     <div className="flex h-[80vh] items-center justify-center">
@@ -93,7 +81,7 @@ export default function Dashboard() {
   if (error) return (
     <div className="p-8">
       <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 p-4 rounded-xl flex items-center gap-3">
-        <AlertCircle /> {error}
+        <AlertCircle /> Error al cargar estadísticas
       </div>
     </div>
   );
@@ -132,7 +120,11 @@ export default function Dashboard() {
     scales: {
       y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
       x: { grid: { display: false }, ticks: { color: textColor } }
-    }
+    },
+    metrics: [
+      { title: 'Exámenes Semanales', value: stats?.semanal || 0, icon: CalendarDays, color: 'bg-emerald-500', percentage: 0 },
+      { title: 'Exámenes Mensuales', value: stats?.mensual || 0, icon: CalendarDays, color: 'bg-blue-500', percentage: 0 }
+    ]
   };
 
   return (
@@ -216,7 +208,8 @@ export default function Dashboard() {
           {stats.topEstablecimientos.map((est, idx) => {
             const hasMeta = est.meta > 0;
             const percentage = hasMeta ? Math.min((est.cantidad / est.meta) * 100, 100) : (est.cantidad / stats.totalAtenciones) * 100;
-            const progressColor = hasMeta ? (percentage >= 100 ? 'bg-emerald-500' : 'bg-accent') : 'bg-slate-400';
+            const progressColor = hasMeta ? getProgressColor(percentage) : 'bg-slate-400';
+            const progressTextColor = hasMeta ? getProgressTextColor(percentage) : 'text-slate-400';
 
             return (
               <div key={idx} className="relative group">
@@ -236,7 +229,7 @@ export default function Dashboard() {
                       {est.cantidad}
                     </span>
                     {hasMeta && (
-                      <span className={`text-[10px] font-bold ${percentage >= 100 ? 'text-emerald-500' : 'text-accent'}`}>
+                      <span className={`text-[10px] font-bold ${progressTextColor}`}>
                         {percentage.toFixed(1)}% de la meta
                       </span>
                     )}

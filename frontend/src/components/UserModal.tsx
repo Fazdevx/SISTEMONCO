@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, User, Mail, Shield, MapPin, Loader2, Lock } from 'lucide-react';
-import { userApi, establishmentApi } from '../../services/api';
+import { userApi } from '../../services/api';
+import { useMutateUser } from '../hooks/queries/useUsers';
+import { useEstablecimientos } from '../hooks/queries/useEstablishments';
 
 export default function UserModal({ isOpen, onClose, userId, onSuccess }) {
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
-  const [establecimientos, setEstablecimientos] = useState([]);
+  const { data: establecimientos = [] } = useEstablecimientos();
+  const { mutateAsync: saveUser, isPending: loading } = useMutateUser();
   const [formData, setFormData] = useState({
     nombres: '',
     email: '',
@@ -20,10 +22,6 @@ export default function UserModal({ isOpen, onClose, userId, onSuccess }) {
       if (!isOpen) return;
 
       try {
-        // 1. Cargar establecimientos siempre
-        const estRes = await establishmentApi.getEstablecimientos();
-        setEstablecimientos(estRes.data || []);
-
         // 2. Si hay ID, cargar usuario
         if (userId) {
           setInitialLoading(true);
@@ -62,20 +60,13 @@ export default function UserModal({ isOpen, onClose, userId, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
-      if (userId) {
-        await userApi.update(userId, formData);
-      } else {
-        await userApi.create(formData);
-      }
+      await saveUser({ id: userId, data: formData });
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Error al guardar:', err);
       alert('Error al guardar usuario');
-    } finally {
-      setLoading(false);
     }
   };
 

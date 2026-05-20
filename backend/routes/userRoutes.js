@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, loadProfile, requireRole } = require('../middleware/auth');
 
 router.use(verifyToken);
+router.use(loadProfile);
 router.use(requireRole(['admin'])); // Solo admin puede gestionar usuarios
 
 router.get('/', userController.listUsers);

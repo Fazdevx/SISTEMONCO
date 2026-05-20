@@ -1,10 +1,18 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-const ThemeContext = createContext({});
+interface ThemeContextType {
+  mode: string;
+  setMode: (m: string) => void;
+  accent: string;
+  setAccent: (a: string) => void;
+  isDark: boolean;
+}
+
+const ThemeContext = createContext<ThemeContextType>({} as ThemeContextType);
 
 export const useTheme = () => useContext(ThemeContext);
 
-export const ThemeProvider = ({ children }) => {
+export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [mode, setMode] = useState(() => localStorage.getItem('theme-mode') || 'dark');
   const [accent, setAccent] = useState(() => localStorage.getItem('theme-accent') || 'indigo');
 

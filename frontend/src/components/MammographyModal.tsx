@@ -1,12 +1,17 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, User, Calendar, MapPin, Activity, AlertCircle, Loader2 } from 'lucide-react';
-import { mammographyApi, establishmentApi } from '../../services/api';
+import { mammographyApi } from '../../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useMutateMammography } from '../hooks/queries/useMammographies';
+import { useEstablecimientos } from '../hooks/queries/useEstablishments';
 
 export default function MammographyModal({ isOpen, onClose, mammographyId, onSuccess }) {
-  const [loading, setLoading] = useState(false);
+  const { isAdmin, perfil } = useAuth();
   const [initialLoading, setInitialLoading] = useState(false);
-  const [establecimientos, setEstablecimientos] = useState([]);
+  const { data: establecimientos = [] } = useEstablecimientos();
+  const { mutateAsync: saveMammography, isPending: loading } = useMutateMammography();
   const [formData, setFormData] = useState({
     dni: '',
     nombres: '',
@@ -19,7 +24,6 @@ export default function MammographyModal({ isOpen, onClose, mammographyId, onSuc
 
   useEffect(() => {
     if (isOpen) {
-      fetchEstablecimientos();
       if (mammographyId) {
         fetchMammography();
       } else {
@@ -27,23 +31,15 @@ export default function MammographyModal({ isOpen, onClose, mammographyId, onSuc
           dni: '',
           nombres: '',
           fecha: new Date().toISOString().split('T')[0],
-          establecimiento_id: '',
+          establecimiento_id: (!isAdmin && perfil?.establecimiento_id) ? perfil.establecimiento_id : '',
           birads: '',
           resultados_mx: '',
           sugerencia_mx: '',
         });
       }
     }
-  }, [isOpen, mammographyId]);
+  }, [isOpen, mammographyId, isAdmin, perfil]);
 
-  const fetchEstablecimientos = async () => {
-    try {
-      const res = await establishmentApi.getEstablecimientos();
-      setEstablecimientos(res.data);
-    } catch (err) {
-      console.error('Error al cargar establecimientos:', err);
-    }
-  };
 
   const fetchMammography = async () => {
     setInitialLoading(true);
@@ -68,20 +64,13 @@ export default function MammographyModal({ isOpen, onClose, mammographyId, onSuc
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
-      if (mammographyId) {
-        await mammographyApi.update(mammographyId, formData);
-      } else {
-        await mammographyApi.create(formData);
-      }
+      await saveMammography({ id: mammographyId, data: formData });
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Error al guardar:', err);
       alert('Error al guardar los datos');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -179,7 +168,8 @@ export default function MammographyModal({ isOpen, onClose, mammographyId, onSuc
                           required
                           value={formData.establecimiento_id}
                           onChange={(e) => setFormData({ ...formData, establecimiento_id: e.target.value })}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all font-bold text-slate-700 dark:text-white"
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all font-bold text-slate-700 dark:text-white disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                           <option value="">Seleccionar...</option>
                           {establecimientos.map(est => (

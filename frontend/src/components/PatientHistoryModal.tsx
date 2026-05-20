@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { patientApi } from '../../services/api';
+import { usePatientHistory } from '../hooks/queries/usePatients';
 import {
   X,
   User,
@@ -23,41 +22,7 @@ const getBiradsStyle = (birads) => {
 };
 
 export default function PatientHistoryModal({ dni, isOpen, onClose }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (isOpen && dni) {
-      const fetchHistory = async () => {
-        setLoading(true);
-        setError(null);
-        
-        if (isNaN(dni)) {
-          setError('DNI inválido para consulta.');
-          setLoading(false);
-          return;
-        }
-
-        try {
-          console.log('Solicitando historial para DNI:', dni);
-          const res = await patientApi.getHistory(dni);
-          console.log('Respuesta historial:', res.data);
-          setData(res.data);
-        } catch (err) {
-          console.error('Error en fetchHistory:', err);
-          if (err.response?.status === 404) {
-            setError(`No se encontró historial para el DNI: ${dni}`);
-          } else {
-            setError('No se pudo cargar el historial de la paciente.');
-          }
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchHistory();
-    }
-  }, [isOpen, dni]);
+  const { data, isLoading: loading, error } = usePatientHistory(isOpen ? dni : null);
 
   if (!isOpen) return null;
 
@@ -106,9 +71,11 @@ export default function PatientHistoryModal({ dni, isOpen, onClose }) {
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-slate-500 font-bold">Cargando historial...</p>
             </div>
-          ) : error ? (
+          ) : error || !data ? (
             <div className="text-center py-20">
-              <p className="text-rose-500 font-bold">{error}</p>
+              <p className="text-rose-500 font-bold">
+                {error ? 'No se pudo cargar el historial de la paciente.' : 'No se encontró historial para el DNI especificado.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-8">

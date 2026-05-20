@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { mammographyApi, establishmentApi } from '../../services/api';
 import {
   AlertTriangle,
@@ -19,17 +20,21 @@ import {
 
 import { motion, AnimatePresence } from 'framer-motion';
 import PatientHistoryModal from '../components/PatientHistoryModal';
+import { Mamografia } from '../types';
+import { usePositiveCases, useMammographyExport } from '../hooks/queries/useMammographies';
+import { useEstablecimientos } from '../hooks/queries/useEstablishments';
+import { useMemo } from 'react';
 
 
 const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
 
-const extraerBirads = (raw) => {
+const extraerBirads = (raw: string | null | undefined) => {
   if (!raw) return null;
   const match = (raw + '').match(/BI-RADS[:\s]*(.+)/i);
   return match ? match[1].trim() : (raw + '').trim();
 };
 
-const getBiradsStyle = (birads) => {
+const getBiradsStyle = (birads: string | null) => {
   if (!birads) return 'bg-slate-50 dark:bg-slate-700 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-600';
   const b = birads.toUpperCase();
   if (b.includes('4')) return 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800';
@@ -39,69 +44,83 @@ const getBiradsStyle = (birads) => {
 };
 
 export default function PositiveCases() {
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { isAdmin, perfil } = useAuth();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [filterBirads, setFilterBirads] = useState('');
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
-  const [establecimientos, setEstablecimientos] = useState([]);
-
-  // Historial Paciente
-  const [historyDni, setHistoryDni] = useState(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
   const LIMIT = 15;
 
-  const fetchCases = async () => {
-    setLoading(true);
-    try {
-      const res = await mammographyApi.getAll(1, 1000, { soloPositivos: true });
-      let positivos = (res.data?.data || []);
+  const { data: establecimientos = [] } = useEstablecimientos();
 
-      positivos = positivos.filter(m => POSITIVOS_REGEX.test((m.birads_mx || '').trim()));
-
-      const seen = new Map();
-      positivos.sort((a, b) => new Date(b.atencion?.fecha) - new Date(a.atencion?.fecha));
-      positivos.forEach(m => {
-        const dni = m.atencion?.paciente?.dni;
-        if (dni && !seen.has(dni)) {
-          seen.set(dni, m);
-        } else if (!dni) {
-          seen.set(`nodni_${m.id}`, m);
-        }
-      });
-      positivos = Array.from(seen.values());
-
-      if (debouncedSearch.trim()) {
-        const q = debouncedSearch.toLowerCase();
-        positivos = positivos.filter(m =>
-          m.atencion?.paciente?.nombres?.toLowerCase().includes(q) ||
-          m.atencion?.paciente?.dni?.includes(q)
-        );
-      }
-
-      if (filterBirads) {
-        positivos = positivos.filter(m => extraerBirads(m.birads_mx) === filterBirads);
-      }
-
-      if (filterEstablecimiento) {
-        positivos = positivos.filter(m =>
-          m.atencion?.establecimiento?.nombre === filterEstablecimiento
-        );
-      }
-
-      setTotal(positivos.length);
-      const from = (page - 1) * LIMIT;
-      setCases(positivos.slice(from, from + LIMIT));
-    } catch (err) {
-      console.error('Error al cargar casos positivos:', err);
-    } finally {
-      setLoading(false);
+  const apiFilters = useMemo(() => {
+    const f: any = { soloPositivos: true };
+    if (!isAdmin && perfil?.establecimiento_id) {
+      f.establecimiento_id = perfil.establecimiento_id;
     }
-  };
+    return f;
+  }, [isAdmin, perfil]);
+
+  const { data: rawPositivos = [], isLoading: loading, refetch } = usePositiveCases(apiFilters);
+
+  // Historial Paciente
+  const [historyDni, setHistoryDni] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Establecer filtro inicial si no es admin
+  useEffect(() => {
+    if (!isAdmin && perfil?.establecimiento_id && establecimientos.length > 0) {
+      const miEst = establecimientos.find((e: any) => e.id === perfil.establecimiento_id);
+      if (miEst) {
+        setFilterEstablecimiento(miEst.nombre);
+      }
+    }
+  }, [isAdmin, perfil, establecimientos]);
+
+  const filteredAndSortedCases = useMemo(() => {
+    const list = Array.isArray(rawPositivos) ? rawPositivos : (Array.isArray(rawPositivos?.data) ? rawPositivos.data : []);
+    let positivos = list.filter((m: Mamografia) => POSITIVOS_REGEX.test((m.birads_mx || '').trim()));
+
+    const seen = new Map();
+    positivos.sort((a: Mamografia, b: Mamografia) => {
+      const dateA = a.atencion?.fecha ? new Date(a.atencion.fecha).getTime() : 0;
+      const dateB = b.atencion?.fecha ? new Date(b.atencion.fecha).getTime() : 0;
+      return dateB - dateA;
+    });
+    positivos.forEach((m: Mamografia) => {
+      const dni = m.atencion?.paciente?.dni;
+      if (dni && !seen.has(dni)) {
+        seen.set(dni, m);
+      } else if (!dni) {
+        seen.set(`nodni_${m.id}`, m);
+      }
+    });
+    positivos = Array.from(seen.values());
+
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
+      positivos = positivos.filter((m: Mamografia) =>
+        m.atencion?.paciente?.nombres?.toLowerCase().includes(q) ||
+        m.atencion?.paciente?.dni?.includes(q)
+      );
+    }
+
+    if (filterBirads) {
+      positivos = positivos.filter((m: Mamografia) => extraerBirads(m.birads_mx) === filterBirads);
+    }
+
+    if (filterEstablecimiento) {
+      positivos = positivos.filter((m: Mamografia) =>
+        m.atencion?.establecimiento?.nombre === filterEstablecimiento
+      );
+    }
+    return positivos;
+  }, [rawPositivos, debouncedSearch, filterBirads, filterEstablecimiento]);
+
+  const total = filteredAndSortedCases.length;
+  const from = (page - 1) * LIMIT;
+  const cases = filteredAndSortedCases.slice(from, from + LIMIT);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -111,32 +130,19 @@ export default function PositiveCases() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    fetchCases();
-  }, [page, debouncedSearch, filterBirads, filterEstablecimiento]);
-
-  useEffect(() => {
-    const loadEstablecimientos = async () => {
-      try {
-        const res = await establishmentApi.getEstablecimientos();
-        setEstablecimientos(res.data || []);
-      } catch (err) {
-        console.error('Error al cargar establecimientos:', err);
-      }
-    };
-    loadEstablecimientos();
-  }, []);
-
   const totalPages = Math.ceil(total / LIMIT);
 
   const handleExport = async () => {
     try {
-      const filters = { soloPositivos: true };
+      const filters: any = { soloPositivos: true };
       if (debouncedSearch) filters.dni = debouncedSearch;
       if (filterBirads) filters.birads_mx = filterBirads;
+      if (!isAdmin && perfil?.establecimiento_id) {
+        filters.establecimiento_id = perfil.establecimiento_id;
+      }
 
       const res = await mammographyApi.export(filters);
-      let data = res.data;
+      let data: Mamografia[] = res.data;
 
       data = data.filter(m => POSITIVOS_REGEX.test((m.birads_mx || '').trim()));
 
@@ -202,7 +208,7 @@ export default function PositiveCases() {
             {loading ? '...' : total} casos
           </motion.div>
           <button
-            onClick={() => fetchCases()}
+            onClick={() => refetch()}
             className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
           >
             <RefreshCw size={18} className="text-slate-500" />
@@ -259,9 +265,10 @@ export default function PositiveCases() {
             <select
               value={filterEstablecimiento}
               onChange={e => { setFilterEstablecimiento(e.target.value); setPage(1); }}
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/10 focus:border-rose-400 transition-all text-sm font-bold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+              disabled={!isAdmin}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/10 focus:border-rose-400 transition-all text-sm font-bold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <option value="">Todas las Sedes</option>
+              <option value="">{isAdmin ? 'Todas las Sedes' : 'Mi Sede'}</option>
               {establecimientos.map(est => (
                 <option key={est.id} value={est.nombre}>{est.nombre}</option>
               ))}
@@ -273,7 +280,7 @@ export default function PositiveCases() {
               onClick={() => {
                 setSearch('');
                 setFilterBirads('');
-                setFilterEstablecimiento('');
+                if (isAdmin) setFilterEstablecimiento('');
                 setPage(1);
               }}
               title="Limpiar filtros"
@@ -303,14 +310,14 @@ export default function PositiveCases() {
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td className="px-8 py-8" colSpan="6">
+                      <td className="px-8 py-8" colSpan={6}>
                         <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded-full w-full opacity-50"></div>
                       </td>
                     </tr>
                   ))
                 ) : cases.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-8 py-20 text-center">
+                    <td colSpan={6} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-4 text-slate-400">
                         <AlertTriangle size={48} className="text-slate-200" />
                         <p className="font-bold">No se encontraron casos positivos</p>
@@ -319,8 +326,8 @@ export default function PositiveCases() {
                     </td>
                   </tr>
                 ) : (
-                  cases.map((m, idx) => {
-                    const label = extraerBirads(m.birads_mx);
+                  cases.map((m: Mamografia, idx) => {
+                    const label = extraerBirads(m.birads_mx || null);
                     return (
                       <motion.tr
                         key={m.id}
@@ -346,7 +353,7 @@ export default function PositiveCases() {
                         </td>
 
                         <td className="px-8 py-5">
-                          <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border ${getBiradsStyle(m.birads_mx)}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border ${getBiradsStyle(m.birads_mx || null)}`}>
                             <Activity size={12} />
                             <p className="text-[10px] w-[65px]">BI-RADS {label || '?'}</p>
                           </span>
@@ -382,7 +389,7 @@ export default function PositiveCases() {
                             </p>
                             <button
                               onClick={() => {
-                                setHistoryDni(m.atencion?.paciente?.dni);
+                                setHistoryDni(m.atencion?.paciente?.dni || null);
                                 setIsHistoryOpen(true);
                               }}
                               title="Ver Historial"

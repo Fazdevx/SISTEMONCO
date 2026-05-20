@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import MammographyList from './pages/MammographyList';
 import Dashboard from './pages/Dashboard';
+import Metas from './pages/Metas';
 import UserList from './pages/UserList';
 import Settings from './pages/Settings';
 import PositiveCases from './pages/PositiveCases';
@@ -25,7 +26,7 @@ function PrivateRoute({ children }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-      <Sidebar user={user} onLogout={signOut} />
+        <Sidebar {...{ user, onLogout: signOut } as any} />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
@@ -51,6 +52,14 @@ function App() {
           element={
             <PrivateRoute>
               <MammographyList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/metas"
+          element={
+            <PrivateRoute>
+              <Metas />
             </PrivateRoute>
           }
         />

@@ -5,6 +5,7 @@ import {
   Search 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getProgressColor, getProgressTextColor } from '../utils/colors';
 
 const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtenciones }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,7 +68,8 @@ const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtencion
                 {filtered.map((est, idx) => {
                   const hasMeta = est.meta > 0;
                   const percentage = hasMeta ? Math.min((est.cantidad / est.meta) * 100, 100) : (est.cantidad / totalAtenciones) * 100;
-                  const progressColor = hasMeta ? (percentage >= 100 ? 'bg-emerald-500' : 'bg-accent') : 'bg-slate-400';
+                  const progressColor = hasMeta ? getProgressColor(percentage) : 'bg-slate-400';
+                  const progressTextColor = hasMeta ? getProgressTextColor(percentage) : 'text-slate-400';
                   
                   return (
                     <div key={idx} className="relative group">
@@ -87,7 +89,7 @@ const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtencion
                             {est.cantidad}
                           </span>
                           {hasMeta && (
-                            <span className={`text-[10px] font-bold ${percentage >= 100 ? 'text-emerald-500' : 'text-accent'}`}>
+                            <span className={`text-[10px] font-bold ${progressTextColor}`}>
                               {percentage.toFixed(1)}%
                             </span>
                           )}

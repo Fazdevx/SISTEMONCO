@@ -1,19 +1,34 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../../services/supabase';
 import axios from 'axios';
+import { Perfil } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
 
-const AuthContext = createContext({});
+interface AuthContextType {
+  user: any;
+  session: any;
+  perfil: Perfil | null;
+  loading: boolean;
+  signIn: (e: string, p: string) => Promise<any>;
+  signOut: () => Promise<void>;
+  isAdmin: boolean;
+  isMicrored: boolean;
+  isEstablecimiento: boolean;
+}
+
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [perfil, setPerfil] = useState(null);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const queryClient = useQueryClient();
 
   // Configurar el token de Axios para todas las peticiones al backend
-  const setAuthToken = (token) => {
+  const setAuthToken = (token: string | null) => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
@@ -22,7 +37,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Obtener el perfil del usuario desde la tabla 'perfiles'
-  const fetchPerfil = async (userId) => {
+  const fetchPerfil = async (userId: string) => {
     const { data, error } = await supabase
       .from('perfiles')
       .select('rol, nombres, establecimiento_id, microred_id')
@@ -32,11 +47,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Error al obtener perfil:', error);
       return null;
     }
-    return data;
+    return { ...data, id: userId };
   };
 
   // Iniciar sesión
-  const signIn = async (email, password) => {
+  const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     // data.session contiene el token
@@ -56,6 +71,7 @@ export const AuthProvider = ({ children }) => {
     setSession(null);
     setPerfil(null);
     setAuthToken(null);
+    queryClient.clear();
   };
 
   // Verificar la sesión al cargar la app
@@ -84,6 +100,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setAuthToken(null);
         setPerfil(null);
+        queryClient.clear();
       }
     });
 

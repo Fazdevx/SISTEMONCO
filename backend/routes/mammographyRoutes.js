@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const mammographyController = require('../controllers/mammographyController');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, loadProfile, requireRole } = require('../middleware/auth');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación y carga de perfil
 router.use(verifyToken);
+router.use(loadProfile);
 
 // 1. Rutas de Estadísticas (Deben ir antes de las rutas con :id)
 router.get('/stats/dashboard', mammographyController.getDashboardStats);

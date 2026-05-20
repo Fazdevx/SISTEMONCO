@@ -22,7 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { userApi } from '../../services/api';
 
 export default function Settings() {
-  const { user, profile } = useAuth();
+  const { user, perfil: profile } = useAuth();
   const { mode, setMode, accent, setAccent, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
@@ -39,7 +39,7 @@ export default function Settings() {
     confirmPassword: ''
   });
 
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState<{ [key: string]: boolean }>({
     email: true,
     push: true,
     weeklyReport: false
@@ -68,7 +68,7 @@ export default function Settings() {
     loadData();
   }, []);
 
-  const handleUpdateProfile = async (e) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: '', text: '' });
@@ -77,13 +77,13 @@ export default function Settings() {
       await userApi.update(user.id, { nombres: profileData.nombres });
       setMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
     } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
+      setMessage({ type: 'error', text: (error as any).response?.data?.error || (error as any).message });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChangePassword = async (e) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       return setMessage({ type: 'error', text: 'Las contraseñas no coinciden' });
@@ -94,7 +94,7 @@ export default function Settings() {
       await userApi.update(user.id, { password: passwordData.newPassword });
       setMessage({ type: 'success', text: 'Contraseña actualizada con éxito' });
       setPasswordData({ newPassword: '', confirmPassword: '' });
-    } catch (error) {
+    } catch (error: any) {
       setMessage({ type: 'error', text: error.response?.data?.error || error.message });
     } finally {
       setLoading(false);
@@ -191,7 +191,7 @@ export default function Settings() {
                     <Building2 className="text-slate-400" size={20} />
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase">Sede Asignada</p>
-                      <p className="font-bold text-slate-700 dark:text-white">{profile?.establecimiento?.nombre || 'Acceso Centralizado'}</p>
+                      <p className="font-bold text-slate-700 dark:text-white">{(profile as any)?.establecimiento?.nombre || 'Acceso Centralizado'}</p>
                     </div>
                   </div>
                   <span className="w-fit px-3 py-1 bg-accent-soft text-accent text-[10px] font-black uppercase rounded-lg">

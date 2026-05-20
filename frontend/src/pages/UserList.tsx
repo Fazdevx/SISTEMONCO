@@ -6,56 +6,31 @@ import {
   Search,
   Edit,
   Trash2,
-  User as UserIcon,
   Shield,
   MapPin,
-  MoreVertical,
   Building2,
-  X,
-  Filter
+  X
 } from 'lucide-react';
-import { mammographyApi, establishmentApi } from '../../services/api';
+import { establishmentApi } from '../../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserModal from '../components/UserModal';
+import { Usuario, Establecimiento } from '../types';
+import { useUsersList, useDeleteUser } from '../hooks/queries/useUsers';
+import { useEstablecimientos } from '../hooks/queries/useEstablishments';
 
 export default function UserList() {
   const { user } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterRol, setFilterRol] = useState('');
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
-  const [establecimientos, setEstablecimientos] = useState([]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await userApi.getAll();
-        setUsers(res.data);
-      } catch (error) {
-        console.error('Error al cargar usuarios:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
-  }, []);
+  const { data: users = [], isLoading: loading } = useUsersList();
+  const { data: establecimientos = [] } = useEstablecimientos();
+  const { mutate: deleteUser } = useDeleteUser();
 
-  useEffect(() => {
-    const loadEstablecimientos = async () => {
-      try {
-        const res = await establishmentApi.getEstablecimientos();
-        setEstablecimientos(res.data || []);
-      } catch (err) {
-        console.error('Error:', err);
-      }
-    };
-    loadEstablecimientos();
-  }, []);
-
-  const filteredUsers = users.filter(u => {
+  const filteredUsers = users.filter((u: Usuario) => {
     // No mostrar el usuario actual en la lista
     if (u.id === user?.id) return false;
 
@@ -70,15 +45,9 @@ export default function UserList() {
     return matchesSearch && matchesRol && matchesEst;
   });
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string | number) => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
-    try {
-      await userApi.delete(id);
-      setUsers(prev => prev.filter(u => u.id !== id));
-    } catch (error) {
-      console.error('Error al eliminar:', error);
-      alert('No se pudo eliminar el usuario');
-    }
+    deleteUser(id);
   };
 
   return (
@@ -174,7 +143,7 @@ export default function UserList() {
                 {loading ? (
                   Array(3).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td className="px-8 py-8" colSpan="4">
+                      <td className="px-8 py-8" colSpan={4}>
                         <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded-full w-full opacity-50"></div>
                       </td>
                     </tr>

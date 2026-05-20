@@ -3,14 +3,29 @@ const mammographyService = require('../services/mammographyService');
 // GET /api/mammographies?page=1&limit=20&establecimiento_id=...
 const listMammographies = async (req, res) => {
   try {
-    const { page = 1, limit = 20, establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos } = req.query;
+    let { page = 1, limit = 20, establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos } = req.query;
     
-    // Validar establecimiento_id si viene en el query
-    if (establecimiento_id && isNaN(establecimiento_id)) {
-      return res.status(400).json({ error: 'establecimiento_id inválido' });
+    console.log('--- listMammographies USER ---', { id: req.user.id, rol: req.user.rol, est: req.user.establecimiento_id });
+
+    // Forzar filtros de seguridad según el rol
+    const filters = { 
+      fecha_inicio, 
+      fecha_fin, 
+      birads, 
+      birads_mx, 
+      dni, 
+      soloPositivos: soloPositivos === 'true' 
+    };
+
+    if (req.user.rol === 'establecimiento') {
+      filters.establecimiento_id = req.user.establecimiento_id;
+    } else if (req.user.rol === 'microred') {
+      filters.microred_id = req.user.microred_id;
+    } else {
+      // Si es admin, puede filtrar por lo que mande en el query
+      filters.establecimiento_id = establecimiento_id;
     }
 
-    const filters = { establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos: soloPositivos === 'true' };
     const result = await mammographyService.getMammographies(filters, parseInt(page) || 1, parseInt(limit) || 20);
     res.json(result);
   } catch (error) {
@@ -59,11 +74,18 @@ const deleteMammography = async (req, res) => {
   }
 };
 
-
 // GET /api/stats/dashboard
 const getDashboardStats = async (req, res) => {
   try {
-    const stats = await mammographyService.getDashboardStats();
+    console.log('--- getDashboardStats USER ---', { id: req.user.id, rol: req.user.rol, est: req.user.establecimiento_id });
+    
+    // Determinar filtros según el rol
+    const filters = {
+      establecimiento_id: req.user.rol === 'establecimiento' ? req.user.establecimiento_id : null,
+      microred_id: req.user.rol === 'microred' ? req.user.microred_id : null
+    };
+    
+    const stats = await mammographyService.getDashboardStats(filters);
     res.json(stats);
   } catch (error) {
     console.error('--- ERROR EN DASHBOARD STATS ---');
@@ -73,18 +95,26 @@ const getDashboardStats = async (req, res) => {
 };
 
 const exportMammographies = async (req, res) => {
-  console.log('--- GET /api/mammographies/export ---');
-  console.log('Query params:', req.query);
   try {
-    const { establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos } = req.query;
+    let { establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos } = req.query;
     
-    if (establecimiento_id && isNaN(establecimiento_id)) {
-      return res.status(400).json({ error: 'establecimiento_id inválido' });
-    }
+    const filters = { 
+      fecha_inicio, 
+      fecha_fin, 
+      birads, 
+      birads_mx, 
+      dni, 
+      soloPositivos: soloPositivos === 'true' 
+    };
 
-    const filters = { establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos: soloPositivos === 'true' };
+    if (req.user.rol === 'establecimiento') {
+      filters.establecimiento_id = req.user.establecimiento_id;
+    } else if (req.user.rol === 'microred') {
+      filters.microred_id = req.user.microred_id;
+    } else {
+      filters.establecimiento_id = establecimiento_id;
+    }
     
-    // Obtenemos todos los registros sin paginación (limit muy alto)
     const result = await mammographyService.getMammographies(filters, 1, 5000);
     res.json(result.data);
   } catch (error) {

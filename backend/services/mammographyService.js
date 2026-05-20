@@ -24,6 +24,8 @@ const insertMammographyBatch = async (mammographyData) => {
 
 // Obtener listado de mamografías con paginación y filtros opcionales
 const getMammographies = async (filters, page = 1, limit = 20) => {
+  console.log('--- getMammographies FILTERS ---', filters);
+  
   let query = supabase
     .from('detalle_mamografia')
     .select(`
@@ -32,15 +34,20 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
         id,
         fecha,
         estado,
-        establecimiento:establecimientos!inner(nombre),
+        establecimiento_id,
+        establecimiento:establecimientos!inner(nombre, microred_id),
         paciente:pacientes!inner(dni, nombres, edad, telefono, direccion, distrito)
       )
     `, { count: 'exact' });
 
-  // Aplicar filtros
+  // Aplicar filtros de seguridad (obligatorios si vienen en filters)
   if (filters.establecimiento_id) {
     query = query.eq('atencion.establecimiento_id', filters.establecimiento_id);
+  } else if (filters.microred_id) {
+    query = query.eq('atencion.establecimiento.microred_id', filters.microred_id);
   }
+
+  // Aplicar otros filtros opcionales
   if (filters.fecha_inicio) {
     query = query.gte('atencion.fecha', filters.fecha_inicio);
   }
@@ -56,9 +63,6 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
   
   if (filters.dni) {
     const q = `%${filters.dni}%`;
-    // Para evitar errores de PostgREST con OR en niveles profundos, 
-    // usamos una aproximación compatible: filtramos por DNI si parece uno, 
-    // o buscamos por nombre si es texto.
     if (/^\d+$/.test(filters.dni)) {
       query = query.ilike('atencion.paciente.dni', q);
     } else {
@@ -74,13 +78,14 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
   const to = from + limit - 1;
   let { data, error, count } = await query.range(from, to);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error en getMammographies query:', error);
+    throw error;
+  }
 
   if (filters.soloPositivos) {
-    // Filtrado riguroso en JS para evitar falsos positivos de fechas/descripciones
     const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
     data = (data || []).filter(r => POSITIVOS_REGEX.test((r.birads_mx || '').trim()));
-    // Ajustamos el count para reflejar el filtrado manual (solo para esta vista)
     count = data.length;
   }
 
@@ -172,29 +177,66 @@ const deleteMammography = async (id) => {
 
 // services/mammographyService.js (añadir al final)
 
-const getDashboardStats = async () => {
+const getDashboardStats = async (filters = {}) => {
+  const { establecimiento_id, microred_id } = filters;
+
   // Total atenciones
-  const { count: totalAtenciones, error: err1 } = await supabase
-    .from('atenciones')
-    .select('*', { count: 'exact', head: true });
+  let query1 = supabase.from('atenciones').select('*', { count: 'exact', head: true });
+  if (establecimiento_id) query1 = query1.eq('establecimiento_id', establecimiento_id);
+  if (microred_id) query1 = query1.eq('establecimientos.microred_id', microred_id); // Requiere join si filtramos por microred en atenciones
+  
+  // Para filtrar atenciones por microred_id, necesitamos un join o una subquery. 
+  // Usamos inner join con establecimientos si hay microred_id.
+  if (microred_id) {
+    query1 = supabase
+      .from('atenciones')
+      .select('id, establecimiento:establecimientos!inner(microred_id)', { count: 'exact', head: true })
+      .eq('establecimiento.microred_id', microred_id);
+  }
+
+  const { count: totalAtenciones, error: err1 } = await query1;
   if (err1) throw err1;
 
   // Total pacientes únicos
-  const { count: totalPacientes, error: err2 } = await supabase
-    .from('pacientes')
-    .select('*', { count: 'exact', head: true });
-  if (err2) throw err2;
+  let finalTotalPacientes = 0;
+  if (establecimiento_id || microred_id) {
+    let queryPacs = supabase.from('atenciones').select('paciente_id');
+    if (establecimiento_id) queryPacs = queryPacs.eq('establecimiento_id', establecimiento_id);
+    if (microred_id) {
+      queryPacs = queryPacs.select('paciente_id, establecimiento:establecimientos!inner(microred_id)')
+                 .eq('establecimiento.microred_id', microred_id);
+    }
+    const { data: pacs, error: errPac } = await queryPacs;
+    if (errPac) throw errPac;
+    finalTotalPacientes = new Set(pacs.map(p => p.paciente_id)).size;
+  } else {
+    const { count, error: err2 } = await supabase
+      .from('pacientes')
+      .select('*', { count: 'exact', head: true });
+    if (err2) throw err2;
+    finalTotalPacientes = count;
+  }
 
-  // Total positivas (pacientes únicos) - solo BI-RADS 4 en varios formatos
-  const { data: biradsPositivos, error: err3 } = await supabase
+  // Total positivas (pacientes únicos)
+  let query3 = supabase
     .from('detalle_mamografia')
     .select(`
       birads_mx,
-      atencion:atenciones(
+      atencion:atenciones!inner(
+        establecimiento_id,
+        establecimiento:establecimientos(microred_id),
         paciente:pacientes(dni)
       )
     `)
     .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.4%,birads_mx.ilike.birads: 4%');
+  
+  if (establecimiento_id) {
+    query3 = query3.eq('atencion.establecimiento_id', establecimiento_id);
+  } else if (microred_id) {
+    query3 = query3.eq('atencion.establecimiento.microred_id', microred_id);
+  }
+  
+  const { data: biradsPositivos, error: err3 } = await query3;
   if (err3) throw err3;
   
   const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
@@ -213,11 +255,20 @@ const getDashboardStats = async () => {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
-  const { data: atencionesPorMes, error: err4 } = await supabase
+  let query4 = supabase
     .from('atenciones')
-    .select('fecha')
+    .select('fecha, establecimiento:establecimientos(microred_id)')
     .gte('fecha', sixMonthsAgo.toISOString().split('T')[0])
     .order('fecha');
+  
+  if (establecimiento_id) {
+    query4 = query4.eq('establecimiento_id', establecimiento_id);
+  } else if (microred_id) {
+    query4 = query4.select('fecha, establecimiento:establecimientos!inner(microred_id)')
+                   .eq('establecimiento.microred_id', microred_id);
+  }
+
+  const { data: atencionesPorMes, error: err4 } = await query4;
   if (err4) throw err4;
 
   const meses = {};
@@ -227,10 +278,23 @@ const getDashboardStats = async () => {
   });
   const atencionesPorMesArray = Object.entries(meses).map(([mes, cantidad]) => ({ mes, cantidad }));
 
-  // Distribución BI-RADS - extraemos solo el número/categoría del texto 'BI-RADS X'
-  const { data: biradsDist, error: err5 } = await supabase
+  // Distribución BI-RADS
+  let query5 = supabase
     .from('detalle_mamografia')
-    .select('birads_mx');
+    .select(`
+      birads_mx,
+      atencion:atenciones!inner(
+        establecimiento_id,
+        establecimiento:establecimientos(microred_id)
+      )
+    `);
+  if (establecimiento_id) {
+    query5 = query5.eq('atencion.establecimiento_id', establecimiento_id);
+  } else if (microred_id) {
+    query5 = query5.eq('atencion.establecimiento.microred_id', microred_id);
+  }
+  
+  const { data: biradsDist, error: err5 } = await query5;
   if (err5) throw err5;
   const distribucionBirads = {};
   biradsDist.forEach(row => {
@@ -239,7 +303,6 @@ const getDashboardStats = async () => {
       distribucionBirads['SIN ESPECIFICAR'] = (distribucionBirads['SIN ESPECIFICAR'] || 0) + 1;
       return;
     }
-    // Normalizar etiquetas comunes
     let label = raw;
     const match = raw.match(/BI-RADS\s*[:\s]*([0-6][ABC]?)/i);
     if (match) {
@@ -247,20 +310,19 @@ const getDashboardStats = async () => {
     } else if (/^[0-6][ABC]?$/.test(raw)) {
       label = `BI-RADS ${raw}`;
     }
-    
     distribucionBirads[label] = (distribucionBirads[label] || 0) + 1;
   });
 
-  // Obtener TODOS los establecimientos para cruzar con atenciones
+  // Establecimientos
   const { data: allEstsDB, error: err6 } = await supabase
     .from('establecimientos')
-    .select('id, nombre, meta_anual');
+    .select('id, nombre, meta_anual, microred_id, microred:microredes(nombre)');
   if (err6) throw err6;
 
-  // Contar atenciones por establecimiento
-  const { data: counts, error: err7 } = await supabase
-    .from('atenciones')
-    .select('establecimiento_id');
+  let query7 = supabase.from('atenciones').select('establecimiento_id');
+  if (establecimiento_id) query7 = query7.eq('establecimiento_id', establecimiento_id);
+  // No filtramos query7 por microred aquí, lo hacemos en el map para eficiencia
+  const { data: counts, error: err7 } = await query7;
   if (err7) throw err7;
 
   const atencionesMap = {};
@@ -270,17 +332,24 @@ const getDashboardStats = async () => {
     }
   });
 
-  const allEstablecimientos = allEstsDB.map(est => ({
-    nombre: est.nombre,
-    cantidad: atencionesMap[est.id] || 0,
-    meta: est.meta_anual || 0
-  })).sort((a, b) => b.cantidad - a.cantidad);
+  const allEstablecimientos = allEstsDB
+    .filter(est => {
+      if (establecimiento_id) return est.id === parseInt(establecimiento_id);
+      if (microred_id) return est.microred_id === parseInt(microred_id);
+      return true;
+    })
+    .map(est => ({
+      nombre: est.nombre,
+      microred: est.microred?.nombre || 'SIN MICRORED',
+      cantidad: atencionesMap[est.id] || 0,
+      meta: est.meta_anual || 0
+    })).sort((a, b) => b.cantidad - a.cantidad);
 
   const topEstablecimientos = allEstablecimientos.slice(0, 5);
 
   return {
     totalAtenciones,
-    totalPacientes,
+    totalPacientes: finalTotalPacientes,
     totalPositivas,
     porcentajePositivas,
     atencionesPorMes: atencionesPorMesArray,
