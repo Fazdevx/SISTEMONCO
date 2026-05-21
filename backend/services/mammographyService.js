@@ -177,6 +177,28 @@ const deleteMammography = async (id) => {
 
 // services/mammographyService.js (añadir al final)
 
+// Helper: Supabase devuelve máximo 1000 filas por defecto.
+// Esta función pagina automáticamente para obtener TODOS los registros.
+const fetchAllRows = async (queryBuilder) => {
+  const PAGE_SIZE = 1000;
+  let allData = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await queryBuilder.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) {
+      hasMore = false;
+    } else {
+      from += PAGE_SIZE;
+    }
+  }
+  return allData;
+};
+
 const getDashboardStats = async (filters = {}) => {
   const { establecimiento_id, microred_id } = filters;
 
@@ -197,17 +219,17 @@ const getDashboardStats = async (filters = {}) => {
   const { count: totalAtenciones, error: err1 } = await query1;
   if (err1) throw err1;
 
-  // Total pacientes únicos
+  // Total pacientes únicos (usar paginación para obtener todos)
   let finalTotalPacientes = 0;
   if (establecimiento_id || microred_id) {
     let queryPacs = supabase.from('atenciones').select('paciente_id');
     if (establecimiento_id) queryPacs = queryPacs.eq('establecimiento_id', establecimiento_id);
     if (microred_id) {
-      queryPacs = queryPacs.select('paciente_id, establecimiento:establecimientos!inner(microred_id)')
+      queryPacs = supabase.from('atenciones')
+                 .select('paciente_id, establecimiento:establecimientos!inner(microred_id)')
                  .eq('establecimiento.microred_id', microred_id);
     }
-    const { data: pacs, error: errPac } = await queryPacs;
-    if (errPac) throw errPac;
+    const pacs = await fetchAllRows(queryPacs);
     finalTotalPacientes = new Set(pacs.map(p => p.paciente_id)).size;
   } else {
     const { count, error: err2 } = await supabase
@@ -236,8 +258,7 @@ const getDashboardStats = async (filters = {}) => {
     query3 = query3.eq('atencion.establecimiento.microred_id', microred_id);
   }
   
-  const { data: biradsPositivos, error: err3 } = await query3;
-  if (err3) throw err3;
+  const biradsPositivos = await fetchAllRows(query3);
   
   const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
   const seenDnis = new Set();
@@ -264,12 +285,15 @@ const getDashboardStats = async (filters = {}) => {
   if (establecimiento_id) {
     query4 = query4.eq('establecimiento_id', establecimiento_id);
   } else if (microred_id) {
-    query4 = query4.select('fecha, establecimiento:establecimientos!inner(microred_id)')
-                   .eq('establecimiento.microred_id', microred_id);
+    query4 = supabase
+      .from('atenciones')
+      .select('fecha, establecimiento:establecimientos!inner(microred_id)')
+      .gte('fecha', sixMonthsAgo.toISOString().split('T')[0])
+      .eq('establecimiento.microred_id', microred_id)
+      .order('fecha');
   }
 
-  const { data: atencionesPorMes, error: err4 } = await query4;
-  if (err4) throw err4;
+  const atencionesPorMes = await fetchAllRows(query4);
 
   const meses = {};
   atencionesPorMes.forEach(row => {
@@ -294,8 +318,7 @@ const getDashboardStats = async (filters = {}) => {
     query5 = query5.eq('atencion.establecimiento.microred_id', microred_id);
   }
   
-  const { data: biradsDist, error: err5 } = await query5;
-  if (err5) throw err5;
+  const biradsDist = await fetchAllRows(query5);
   const distribucionBirads = {};
   biradsDist.forEach(row => {
     let raw = (row.birads_mx || '').trim().toUpperCase();
@@ -319,11 +342,11 @@ const getDashboardStats = async (filters = {}) => {
     .select('id, nombre, meta_anual, microred_id, microred:microredes(nombre)');
   if (err6) throw err6;
 
+  // Obtener TODAS las atenciones para contar por establecimiento (sin límite de 1000)
   let query7 = supabase.from('atenciones').select('establecimiento_id');
   if (establecimiento_id) query7 = query7.eq('establecimiento_id', establecimiento_id);
-  // No filtramos query7 por microred aquí, lo hacemos en el map para eficiencia
-  const { data: counts, error: err7 } = await query7;
-  if (err7) throw err7;
+  // Si hay microred, filtramos en el map posterior con allEstsDB
+  const counts = await fetchAllRows(query7);
 
   const atencionesMap = {};
   counts.forEach(c => {
