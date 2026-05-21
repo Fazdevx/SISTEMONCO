@@ -1,4 +1,4 @@
-# <p align="center">📖 Manual de Operaciones - SISTEMONCO</p>
+# <p align="center">📖 Manual de Operaciones - ONCO - SISTEM</p>
 
 ---
 
@@ -57,12 +57,12 @@ El seguimiento de casos **BI-RADS 4 y 5** es prioridad nacional:
 ---
 
 ## 🎨 Personalización
-SISTEMONCO se adapta a tu entorno:
+ONCO - SISTEM se adapta a tu entorno:
 - **Dark Mode:** Ideal para entornos clínicos con baja iluminación para reducir la fatiga visual.
 - **Filtros Persistentes:** El sistema recuerda tu última búsqueda en la lista de mamografías durante la sesión activa.
 
 ---
 
 <p align="center">
-  <sub>SISTEMONCO v1.0.0 - Documentación para Desarrolladores y Usuarios Finales</sub>
+  <sub>ONCO - SISTEM v1.0.0 - Documentación para Desarrolladores y Usuarios Finales</sub>
 </p>

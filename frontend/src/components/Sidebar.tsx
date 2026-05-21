@@ -34,7 +34,7 @@ export default function Sidebar({ onLogout }) {
             <Activity size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="font-black text-xl tracking-tight text-slate-800 dark:text-white leading-none">SISTEMONCO</h1>
+            <h1 className="font-black text-md tracking-tight text-slate-800 dark:text-white leading-none">ONCO - SISTEM</h1>
             <p className="text-[10px] font-bold text-accent uppercase tracking-widest mt-1">Prevención Cáncer</p>
           </div>
         </div>

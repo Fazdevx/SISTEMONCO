@@ -60,6 +60,19 @@ const getPatientHistory = async (req, res) => {
   }
 };
 
+const updatePatient = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const result = await patientService.updatePatient(id, updateData);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
-  getPatientHistory
+  getPatientHistory,
+  updatePatient
 };

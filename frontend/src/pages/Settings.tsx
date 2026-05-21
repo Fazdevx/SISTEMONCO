@@ -20,13 +20,19 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { userApi } from '../../services/api';
+import toast from 'react-hot-toast';
 
 export default function Settings() {
   const { user, perfil: profile } = useAuth();
-  const { mode, setMode, accent, setAccent, isDark } = useTheme();
+  const { 
+    mode, setMode, 
+    accent, setAccent, 
+    isDark,
+    toastPosition, setToastPosition,
+    toastDuration, setToastDuration
+  } = useTheme();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
 
   // Estados para formularios
   const [profileData, setProfileData] = useState({
@@ -39,11 +45,24 @@ export default function Settings() {
     confirmPassword: ''
   });
 
-  const [notifications, setNotifications] = useState<{ [key: string]: boolean }>({
+  const [notifications, setNotifications] = useState<{ [key: string]: any }>({
     email: true,
     push: true,
     weeklyReport: false
   });
+
+  const updateNotificationSetting = (id: string, value: any) => {
+    if (id === 'position') {
+      setToastPosition(value);
+      toast.success(`Posición cambiada a ${value}`, { position: value as any });
+    } else if (id === 'duration') {
+      setToastDuration(value);
+      toast.success(`Duración ajustada a ${value}ms`, { duration: value });
+    } else {
+      setNotifications(prev => ({ ...prev, [id]: value }));
+      toast.success(`${id === 'email' ? 'Correo' : id === 'push' ? 'Push' : 'Reporte'} ${value ? 'activado' : 'desactivado'}`);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,13 +90,12 @@ export default function Settings() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage({ type: '', text: '' });
 
     try {
       await userApi.update(user.id, { nombres: profileData.nombres });
-      setMessage({ type: 'success', text: 'Perfil actualizado correctamente' });
+      toast.success('Perfil actualizado correctamente');
     } catch (error) {
-      setMessage({ type: 'error', text: (error as any).response?.data?.error || (error as any).message });
+      toast.error((error as any).response?.data?.error || (error as any).message);
     } finally {
       setLoading(false);
     }
@@ -86,16 +104,16 @@ export default function Settings() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      return setMessage({ type: 'error', text: 'Las contraseñas no coinciden' });
+      return toast.error('Las contraseñas no coinciden');
     }
 
     setLoading(true);
     try {
       await userApi.update(user.id, { password: passwordData.newPassword });
-      setMessage({ type: 'success', text: 'Contraseña actualizada con éxito' });
+      toast.success('Contraseña actualizada con éxito');
       setPasswordData({ newPassword: '', confirmPassword: '' });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
+      toast.error(error.response?.data?.error || error.message);
     } finally {
       setLoading(false);
     }
@@ -112,7 +130,7 @@ export default function Settings() {
     <div className="p-6 lg:p-10 max-w-4xl mx-auto min-h-screen">
       <div className="mb-10">
         <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">Configuración</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Personaliza tu entorno de trabajo en SISTEMONCO</p>
+        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Personaliza tu entorno de trabajo en ONCO - SISTEM</p>
       </div>
 
       {/* Navegación por Pestañas */}
@@ -131,24 +149,6 @@ export default function Settings() {
           </button>
         ))}
       </div>
-
-      {/* Alertas */}
-      <AnimatePresence>
-        {message.text && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className={`p-4 rounded-2xl mb-6 flex items-center gap-3 border ${message.type === 'success'
-              ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-              : 'bg-rose-50 border-rose-100 text-rose-700'
-              }`}
-          >
-            {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-            <span className="text-sm font-bold">{message.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden min-h-[500px] transition-colors duration-300">
         <div className="p-8 lg:p-12">
@@ -333,36 +333,88 @@ export default function Settings() {
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                   <Bell size={20} />
                 </div>
-                Canales de Notificación
+                Configuración de Notificaciones
               </h2>
 
-              <div className="space-y-4">
-                {[
-                  { id: 'email', icon: Mail, label: 'Alertas por Correo', desc: 'Recibe un aviso cuando se detecte un BI-RADS 4' },
-                  { id: 'push', icon: Zap, label: 'Notificaciones Push', desc: 'Alertas en tiempo real en tu navegador' },
-                  { id: 'weeklyReport', icon: Monitor, label: 'Resumen Semanal', desc: 'Informe estadístico de tamizajes realizados' }
-                ].map(n => (
-                  <label
-                    key={n.id}
-                    className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 rounded-[2rem] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-2xl shadow-sm text-slate-400">
-                        <n.icon size={20} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-800 dark:text-white">{n.label}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{n.desc}</p>
-                      </div>
+              <div className="space-y-8">
+                {/* Canales */}
+                <div className="space-y-4">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-wider ml-1">Canales de Comunicación</label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { id: 'email', icon: Mail, label: 'Alertas por Correo', desc: 'Recibe un aviso cuando se detecte un BI-RADS 4' },
+                      { id: 'push', icon: Zap, label: 'Notificaciones Push', desc: 'Alertas en tiempo real en tu navegador' },
+                      { id: 'weeklyReport', icon: Monitor, label: 'Resumen Semanal', desc: 'Informe estadístico de tamizajes realizados' }
+                    ].map(n => (
+                      <label
+                        key={n.id}
+                        className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-700 rounded-2xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-sm text-slate-400">
+                            <n.icon size={18} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white">{n.label}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{n.desc}</p>
+                          </div>
+                        </div>
+                        <div className={`w-12 h-6 rounded-full transition-all relative ${notifications[n.id] ? 'bg-accent' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                          <input
+                            type="checkbox"
+                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            checked={notifications[n.id]}
+                            onChange={() => updateNotificationSetting(n.id, !notifications[n.id])}
+                          />
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${notifications[n.id] ? 'left-7' : 'left-1'}`} />
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Personalización Hot-Toast */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-wider ml-1">Posición en Pantalla</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        'top-left', 'top-center', 'top-right',
+                        'bottom-left', 'bottom-center', 'bottom-right'
+                      ].map(pos => (
+                        <button
+                          key={pos}
+                          onClick={() => updateNotificationSetting('position', pos)}
+                          className={`p-2 rounded-xl border text-[10px] font-black uppercase tracking-tighter transition-all ${toastPosition === pos
+                              ? 'bg-accent border-accent text-white shadow-md shadow-accent/20'
+                              : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-700 text-slate-400 hover:border-accent/30'
+                            }`}
+                        >
+                          {pos.replace('-', ' ')}
+                        </button>
+                      ))}
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications[n.id]}
-                      onChange={() => setNotifications({ ...notifications, [n.id]: !notifications[n.id] })}
-                      className="w-6 h-6 accent-indigo-600 rounded-lg cursor-pointer"
-                    />
-                  </label>
-                ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-wider ml-1">Duración (ms)</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="range"
+                        min="1000"
+                        max="10000"
+                        step="500"
+                        value={toastDuration}
+                        onChange={(e) => updateNotificationSetting('duration', parseInt(e.target.value))}
+                        className="flex-1 accent-accent"
+                      />
+                      <span className="w-16 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg text-[10px] font-black text-accent text-center">
+                        {toastDuration}ms
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-medium italic">Tiempo que la notificación permanece visible.</p>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

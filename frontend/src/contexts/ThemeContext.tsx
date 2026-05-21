@@ -6,6 +6,10 @@ interface ThemeContextType {
   accent: string;
   setAccent: (a: string) => void;
   isDark: boolean;
+  toastPosition: string;
+  setToastPosition: (p: string) => void;
+  toastDuration: number;
+  setToastDuration: (d: number) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({} as ThemeContextType);
@@ -15,6 +19,8 @@ export const useTheme = () => useContext(ThemeContext);
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [mode, setMode] = useState(() => localStorage.getItem('theme-mode') || 'dark');
   const [accent, setAccent] = useState(() => localStorage.getItem('theme-accent') || 'indigo');
+  const [toastPosition, setToastPosition] = useState(() => localStorage.getItem('toast-position') || 'top-right');
+  const [toastDuration, setToastDuration] = useState(() => Number(localStorage.getItem('toast-duration')) || 3000);
 
   // Determinar si el modo oscuro está activo
   const isDark = mode === 'dark' || 
@@ -37,6 +43,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     document.documentElement.setAttribute('data-accent', accent);
   }, [accent]);
 
+  // Persistir configuración de toasts
+  useEffect(() => {
+    localStorage.setItem('toast-position', toastPosition);
+  }, [toastPosition]);
+
+  useEffect(() => {
+    localStorage.setItem('toast-duration', toastDuration.toString());
+  }, [toastDuration]);
+
   // Escuchar cambios en las preferencias del sistema
   useEffect(() => {
     if (mode !== 'system') return;
@@ -49,7 +64,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   }, [mode]);
 
   return (
-    <ThemeContext.Provider value={{ mode, setMode, accent, setAccent, isDark }}>
+    <ThemeContext.Provider value={{ 
+      mode, setMode, 
+      accent, setAccent, 
+      isDark,
+      toastPosition, setToastPosition,
+      toastDuration, setToastDuration
+    }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -188,7 +188,7 @@ export default function PatientHistoryModal({ dni, isOpen, onClose }) {
         {/* Footer */}
         <div className="p-6 border-t border-slate-100 dark:border-slate-700 text-center bg-slate-50/30 dark:bg-slate-800/30">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-            SISTEMONCO © 2026 — Seguimiento Oncológico
+            ONCO - SISTEM © 2026 — Seguimiento Oncológico
           </p>
         </div>
       </motion.div>

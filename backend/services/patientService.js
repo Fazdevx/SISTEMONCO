@@ -78,6 +78,16 @@ const insertPatientsBatch = async (patientsData) => {
   }
 };
 
+const updatePatient = async (id, updateData) => {
+  const { error } = await supabase
+    .from('pacientes')
+    .update(updateData)
+    .eq('id', id);
+  if (error) throw error;
+  return { success: true };
+};
+
 module.exports = {
-  insertPatientsBatch
+  insertPatientsBatch,
+  updatePatient
 };

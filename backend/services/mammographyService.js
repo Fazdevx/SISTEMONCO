@@ -31,12 +31,9 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
     .select(`
       *,
       atencion:atenciones!inner(
-        id,
-        fecha,
-        estado,
-        establecimiento_id,
-        establecimiento:establecimientos!inner(nombre, microred_id),
-        paciente:pacientes!inner(dni, nombres, edad, telefono, direccion, distrito)
+        *,
+        establecimiento:establecimientos(nombre, microred_id),
+        paciente:pacientes(*)
       )
     `, { count: 'exact' });
 
@@ -71,7 +68,8 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
   }
 
   if (filters.soloPositivos) {
-    query = query.or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.4%,birads_mx.ilike.birads: 4%');
+    // Filtro inclusivo para 4, 5 y 6 en varios formatos
+    query = query.or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%,birads_mx.ilike.birads: 4%,birads_mx.ilike.birads: 5%,birads_mx.ilike.birads: 6%');
   }
 
   const from = (page - 1) * limit;
@@ -99,11 +97,7 @@ const getMammographyById = async (id) => {
     .select(`
       *,
       atencion:atenciones(
-        id,
-        fecha,
-        estado,
-        resultado_general,
-        observaciones,
+        *,
         establecimiento:establecimientos(*),
         paciente:pacientes(*)
       )
@@ -117,34 +111,138 @@ const getMammographyById = async (id) => {
 
 // Actualizar una mamografía (incluye datos de atención y paciente)
 const updateMammography = async (id, updateData) => {
+  console.log('--- updateMammography updateData ---', updateData);
   const { atencion, paciente, ...mammoData } = updateData;
 
+  // Si vienen datos planos (compatibilidad con frontend actual)
+  let finalMammoData = { ...mammoData };
+  let finalAtencion = atencion || null;
+  let finalPaciente = paciente || null;
+
+  // Si es un objeto plano desde el modal
+  if (!atencion && !paciente && updateData.dni) {
+    // Buscar la mamografía actual para obtener IDs
+    const current = await getMammographyById(id);
+    if (current) {
+      finalAtencion = {
+        id: current.atencion_id,
+        fecha: updateData.fecha,
+        establecimiento_id: updateData.establecimiento_id || null
+      };
+      finalPaciente = {
+        id: current.atencion?.paciente?.id,
+        dni: updateData.dni,
+        nombres: updateData.nombres
+      };
+      
+      // Limpiar campos que no van en detalle_mamografia
+      delete finalMammoData.dni;
+      delete finalMammoData.nombres;
+      delete finalMammoData.fecha;
+      delete finalMammoData.establecimiento_id;
+      
+      // Sincronizar birads_mx con birads
+      // Si el usuario envió 'birads' (el número), actualizamos 'birads_mx' (el texto)
+      if (updateData.birads !== undefined) {
+        finalMammoData.birads = updateData.birads;
+        if (updateData.birads) {
+          finalMammoData.birads_mx = `BI-RADS ${updateData.birads}`;
+        } else {
+          finalMammoData.birads_mx = null;
+        }
+      }
+    } else {
+      throw new Error('No se encontró el registro de mamografía a actualizar');
+    }
+  }
+
   // Actualizar paciente si se envía información
-  if (paciente && paciente.id) {
+  if (finalPaciente && finalPaciente.id) {
+    const { id: pId, ...pData } = finalPaciente;
     const { error: pacienteError } = await supabase
       .from('pacientes')
-      .update(paciente)
-      .eq('id', paciente.id);
+      .update(pData)
+      .eq('id', pId);
     if (pacienteError) throw pacienteError;
   }
 
   // Actualizar atención
-  if (atencion && atencion.id) {
+  if (finalAtencion && finalAtencion.id) {
+    const { id: aId, ...aData } = finalAtencion;
     const { error: atencionError } = await supabase
       .from('atenciones')
-      .update(atencion)
-      .eq('id', atencion.id);
+      .update(aData)
+      .eq('id', aId);
     if (atencionError) throw atencionError;
   }
 
   // Actualizar detalle mamografía
-  const { error: mammoError } = await supabase
-    .from('detalle_mamografia')
-    .update(mammoData)
-    .eq('id', id);
-  if (mammoError) throw mammoError;
+  if (Object.keys(finalMammoData).length > 0) {
+    const { error: mammoError } = await supabase
+      .from('detalle_mamografia')
+      .update(finalMammoData)
+      .eq('id', id);
+    if (mammoError) throw mammoError;
+  }
 
   return { success: true };
+};
+
+const createMammography = async (data) => {
+  console.log('--- createMammography data ---', data);
+  const { dni, nombres, fecha, establecimiento_id, birads, resultados_mx, sugerencia_mx } = data;
+
+  // 1. Buscar o Crear Paciente
+  let pacienteId;
+  const { data: existingPaciente } = await supabase
+    .from('pacientes')
+    .select('id')
+    .eq('dni', dni)
+    .single();
+
+  if (existingPaciente) {
+    pacienteId = existingPaciente.id;
+    // Opcional: actualizar nombre si cambió
+    await supabase.from('pacientes').update({ nombres }).eq('id', pacienteId);
+  } else {
+    const { data: newPaciente, error: pError } = await supabase
+      .from('pacientes')
+      .insert({ dni, nombres })
+      .select()
+      .single();
+    if (pError) throw pError;
+    pacienteId = newPaciente.id;
+  }
+
+  // 2. Crear Atención
+  const { data: newAtencion, error: aError } = await supabase
+    .from('atenciones')
+    .insert({
+      paciente_id: pacienteId,
+      establecimiento_id: establecimiento_id || null,
+      fecha: fecha || new Date().toISOString().split('T')[0],
+      estado: 'REGISTRADO',
+      campaña_id: 1
+    })
+    .select()
+    .single();
+  if (aError) throw aError;
+
+  // 3. Crear Detalle Mamografía
+  const { data: newMammo, error: mError } = await supabase
+    .from('detalle_mamografia')
+    .insert({
+      atencion_id: newAtencion.id,
+      birads,
+      birads_mx: birads ? `BI-RADS ${birads}` : null,
+      resultados_mx,
+      sugerencia_mx
+    })
+    .select()
+    .single();
+  if (mError) throw mError;
+
+  return newMammo;
 };
 
 // Eliminar una mamografía (borrado físico en cascada)
@@ -250,7 +348,7 @@ const getDashboardStats = async (filters = {}) => {
         paciente:pacientes(dni)
       )
     `)
-    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.4%,birads_mx.ilike.birads: 4%');
+    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%,birads_mx.ilike.birads: 4%,birads_mx.ilike.birads: 5%,birads_mx.ilike.birads: 6%');
   
   if (establecimiento_id) {
     query3 = query3.eq('atencion.establecimiento_id', establecimiento_id);
@@ -260,7 +358,7 @@ const getDashboardStats = async (filters = {}) => {
   
   const biradsPositivos = await fetchAllRows(query3);
   
-  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
+  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
   const seenDnis = new Set();
   (biradsPositivos || []).forEach(r => {
     if (POSITIVOS_REGEX.test((r.birads_mx || '').trim())) {
@@ -387,6 +485,7 @@ module.exports = {
   getMammographies,
   getMammographyById,
   updateMammography,
+  createMammography,
   deleteMammography,
   getDashboardStats
 };

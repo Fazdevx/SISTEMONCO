@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mammographyApi } from '../../../services/api';
 import { Mamografia } from '../../types';
+import toast from 'react-hot-toast';
 
 export const useMammographyStats = () => {
   return useQuery({
@@ -56,10 +57,14 @@ export const useMutateMammography = () => {
       const res = await mammographyApi.create(data);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(variables.id ? 'Registro actualizado correctamente' : 'Registro creado correctamente');
       queryClient.invalidateQueries({ queryKey: ['mammographyStats'] });
       queryClient.invalidateQueries({ queryKey: ['mammographies'] });
       queryClient.invalidateQueries({ queryKey: ['positiveCases'] });
     },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Error al procesar la solicitud');
+    }
   });
 };

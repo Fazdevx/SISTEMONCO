@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../../../services/api';
 import { Usuario } from '../../types';
+import toast from 'react-hot-toast';
 
 export const useUsersList = () => {
   return useQuery({
@@ -24,9 +25,13 @@ export const useMutateUser = () => {
       const res = await userApi.create(data);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(variables.id ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente');
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Error al procesar el usuario');
+    }
   });
 };
 
@@ -38,7 +43,11 @@ export const useDeleteUser = () => {
       await userApi.delete(id);
     },
     onSuccess: () => {
+      toast.success('Usuario eliminado correctamente');
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Error al eliminar el usuario');
+    }
   });
 };

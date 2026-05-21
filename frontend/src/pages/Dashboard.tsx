@@ -29,6 +29,8 @@ import { motion } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import AllEstablishmentsModal from '../components/AllEstablishmentsModal';
 import { getProgressColor, getProgressTextColor } from '../utils/colors';
+import toast from 'react-hot-toast';
+import { useEffect } from 'react';
 
 ChartJS.register(
   CategoryScale,
@@ -68,6 +70,18 @@ export default function Dashboard() {
   const { data: stats, isLoading: loading, error } = useMammographyStats();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isDark } = useTheme();
+
+  useEffect(() => {
+    if (stats) {
+      const totalMetas = stats.allEstablecimientos.reduce((acc, est) => acc + (est.meta || 0), 0);
+      const percentage = totalMetas > 0 ? (stats.totalAtenciones / totalMetas * 100).toFixed(1) : 0;
+      
+      toast(`Progreso General: ${stats.totalAtenciones} atendidos de una meta total de ${totalMetas} (${percentage}%)`, {
+        icon: '📊',
+        duration: 5000,
+      });
+    }
+  }, [!!stats]);
 
   if (loading) return (
     <div className="flex h-[80vh] items-center justify-center">

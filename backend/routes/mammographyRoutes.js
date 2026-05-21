@@ -13,6 +13,7 @@ router.get('/export', mammographyController.exportMammographies);
 
 // 2. Rutas CRUD
 router.get('/', mammographyController.listMammographies);
+router.post('/', requireRole(['admin', 'microred', 'establecimiento']), mammographyController.createMammography);
 router.get('/:id', mammographyController.getMammography);
 router.put('/:id', requireRole(['admin', 'microred', 'establecimiento']), mammographyController.updateMammography);
 router.delete('/:id', requireRole(['admin']), mammographyController.deleteMammography);

@@ -47,6 +47,18 @@ const getMammography = async (req, res) => {
   }
 };
 
+// POST /api/mammographies
+const createMammography = async (req, res) => {
+  try {
+    const data = req.body;
+    const result = await mammographyService.createMammography(data);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // PUT /api/mammographies/:id
 const updateMammography = async (req, res) => {
   try {
@@ -127,6 +139,7 @@ const exportMammographies = async (req, res) => {
 module.exports = {
   listMammographies,
   getMammography,
+  createMammography,
   updateMammography,
   deleteMammography,
   getDashboardStats,

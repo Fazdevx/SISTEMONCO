@@ -46,12 +46,20 @@ export default function MammographyModal({ isOpen, onClose, mammographyId, onSuc
     try {
       const res = await mammographyApi.getById(mammographyId);
       const m = res.data;
+      
+      // Intentar extraer el número de BI-RADS si birads_mx tiene formato "BI-RADS 4"
+      let biradsValue = m.birads || '';
+      if (!biradsValue && m.birads_mx) {
+        const match = m.birads_mx.match(/BI-RADS\s*(.+)/i);
+        biradsValue = match ? match[1].trim() : m.birads_mx;
+      }
+
       setFormData({
         dni: m.atencion?.paciente?.dni || '',
         nombres: m.atencion?.paciente?.nombres || '',
         fecha: m.atencion?.fecha || '',
         establecimiento_id: m.atencion?.establecimiento_id || '',
-        birads: m.birads || '',
+        birads: biradsValue,
         resultados_mx: m.resultados_mx || '',
         sugerencia_mx: m.sugerencia_mx || '',
       });

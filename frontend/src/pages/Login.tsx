@@ -30,7 +30,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 selection:bg-accent-soft selection:text-accent transition-colors duration-300">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full"
@@ -42,9 +42,9 @@ export default function Login() {
                 <Activity className="text-white" size={36} />
               </div>
             </div>
-            
+
             <h2 className="text-4xl font-black text-center text-slate-800 dark:text-white tracking-tighter">
-              SISTEMONCO
+              ONCO - SISTEM
             </h2>
             <p className="text-center text-slate-400 dark:text-slate-500 mt-3 font-bold uppercase text-[10px] tracking-[0.2em]">
               Gestión de Tamizaje Oncológico
@@ -57,13 +57,13 @@ export default function Login() {
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-300 dark:text-slate-600 group-focus-within:text-accent transition-colors">
                     <Mail size={20} />
                   </div>
-                  <input 
-                    type="email" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="block w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent rounded-[1.5rem] text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-0 focus:border-accent focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
                     placeholder="admin@ejemplo.com"
-                    required 
+                    required
                   />
                 </div>
               </div>
@@ -74,19 +74,19 @@ export default function Login() {
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-300 dark:text-slate-600 group-focus-within:text-accent transition-colors">
                     <Lock size={20} />
                   </div>
-                  <input 
-                    type="password" 
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="block w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent rounded-[1.5rem] text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-0 focus:border-accent focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
                     placeholder="••••••••"
-                    required 
+                    required
                   />
                 </div>
               </div>
 
               {error && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="bg-rose-50 dark:bg-rose-900/20 border-2 border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 px-5 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold shadow-sm"
@@ -96,8 +96,8 @@ export default function Login() {
                 </motion.div>
               )}
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isLoading}
                 className="w-full bg-slate-900 dark:bg-accent hover:bg-accent dark:hover:bg-accent-hover text-white font-black py-5 rounded-[1.5rem] shadow-xl shadow-slate-200 dark:shadow-accent/20 hover:shadow-accent/20 transform transition-all active:scale-[0.97] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-4"
               >
@@ -115,7 +115,7 @@ export default function Login() {
               </button>
             </form>
           </div>
-          
+
           <div className="bg-slate-50 dark:bg-slate-800/50 p-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-4">
             <span className="h-px w-8 bg-slate-200 dark:bg-slate-700"></span>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] font-black">

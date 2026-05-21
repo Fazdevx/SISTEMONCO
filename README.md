@@ -1,4 +1,4 @@
-# <p align="center">🏥 SISTEMONCO</p>
+# <p align="center">🏥 ONCO - SISTEM</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-brightgreen" alt="Status">
@@ -13,7 +13,7 @@
 
 ## 🌟 Descripción General
 
-**SISTEMONCO** es una solución "Full-Stack" de alto rendimiento diseñada para la **gestión, monitoreo y análisis oncológico**. El sistema optimiza el flujo de trabajo clínico permitiendo el seguimiento preciso de tamizajes de mamografía, la gestión de resultados críticos (BI-RADS) y la automatización inteligente de datos masivos.
+**ONCO - SISTEM** es una solución "Full-Stack" de alto rendimiento diseñada para la **gestión, monitoreo y análisis oncológico**. El sistema optimiza el flujo de trabajo clínico permitiendo el seguimiento preciso de tamizajes de mamografía, la gestión de resultados críticos (BI-RADS) y la automatización inteligente de datos masivos.
 
 > [!IMPORTANT]
 > Diseñado específicamente para reducir la brecha entre la captura de datos manual y el análisis clínico oportuno.
@@ -42,7 +42,7 @@
 ## 📂 Estructura del Ecosistema
 
 ```bash
-SISTEMONCO/
+ONCO - SISTEM/
 ├── 🚀 backend/           # Lógica de API & Data Processing
 │   ├── 🛠️ config/        # Supabase client & settings
 │   ├── 🎮 controllers/   # Request handlers
@@ -64,7 +64,7 @@ SISTEMONCO/
 ```bash
 # Clonar el core
 git clone <repo-url>
-cd SISTEMONCO
+cd ONCO - SISTEM
 
 # Levantar el cerebro (Backend)
 cd backend && npm install
@@ -102,4 +102,4 @@ VITE_API_URL=http://localhost:3000
 ---
 
 ## 📜 Licencia
-Distribuido bajo la licencia **ISC**. © 2026 **SISTEMONCO Team**.
+Distribuido bajo la licencia **ISC**. © 2026 **ONCO - SISTEM Team**.

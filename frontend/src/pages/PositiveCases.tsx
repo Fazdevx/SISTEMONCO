@@ -24,9 +24,9 @@ import { Mamografia } from '../types';
 import { usePositiveCases, useMammographyExport } from '../hooks/queries/useMammographies';
 import { useEstablecimientos } from '../hooks/queries/useEstablishments';
 import { useMemo } from 'react';
+import toast from 'react-hot-toast';
 
-
-const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
+const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
 
 const extraerBirads = (raw: string | null | undefined) => {
   if (!raw) return null;
@@ -77,6 +77,20 @@ export default function PositiveCases() {
       }
     }
   }, [isAdmin, perfil, establecimientos]);
+
+  useEffect(() => {
+    if (rawPositivos && Array.isArray(rawPositivos) && rawPositivos.length > 0) {
+      toast(`Alerta: Tienes ${rawPositivos.length} casos positivos que requieren seguimiento prioritario.`, {
+        icon: '🚨',
+        duration: 6000,
+        style: {
+          border: '1px solid #ef4444',
+          background: '#0f172a',
+          color: '#ffffff',
+        },
+      });
+    }
+  }, [!!rawPositivos]);
 
   const filteredAndSortedCases = useMemo(() => {
     const list = Array.isArray(rawPositivos) ? rawPositivos : (Array.isArray(rawPositivos?.data) ? rawPositivos.data : []);

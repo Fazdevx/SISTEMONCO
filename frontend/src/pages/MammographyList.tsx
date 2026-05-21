@@ -27,6 +27,7 @@ import { useMammographiesList, useMutateMammography } from '../hooks/queries/use
 import { useEstablecimientos } from '../hooks/queries/useEstablishments';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import toast from 'react-hot-toast';
 
 export default function MammographyList() {
   const { isAdmin, perfil } = useAuth();
@@ -78,11 +79,12 @@ export default function MammographyList() {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este registro?')) return;
     try {
       await mammographyApi.delete(id);
+      toast.success('Registro eliminado correctamente');
       queryClient.invalidateQueries({ queryKey: ['mammographies'] });
       queryClient.invalidateQueries({ queryKey: ['mammographyStats'] });
     } catch (error) {
       console.error('Error al eliminar:', error);
-      alert('No se pudo eliminar el registro');
+      toast.error('No se pudo eliminar el registro');
     }
   };
 
@@ -119,9 +121,10 @@ export default function MammographyList() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      toast.success('Exportación generada con éxito');
     } catch (error) {
       console.error('Error al exportar:', error);
-      alert('No se pudo generar la exportación');
+      toast.error('No se pudo generar la exportación');
     }
   };
 
@@ -265,7 +268,7 @@ export default function MammographyList() {
                           const raw = (m.birads_mx || '').trim();
                           const match = raw.match(/BI-RADS\s*(.+)/i);
                           const label = match ? match[1].trim() : (raw || 'S/N');
-                          const isPositive = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i.test(raw);
+                          const isPositive = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i.test(raw);
                           return (
                             <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${isPositive
                               ? 'bg-rose-50 text-rose-600 border border-rose-100'
@@ -282,13 +285,13 @@ export default function MammographyList() {
                       </td>
                       <td className="px-8 py-5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                const cleanDni = m.atencion?.paciente?.dni?.toString().trim();
-                                console.log('Abriendo historial para DNI:', cleanDni);
-                                setHistoryDni(cleanDni);
-                                setIsHistoryOpen(true);
-                              }}
+                          <button
+                            onClick={() => {
+                              const cleanDni = m.atencion?.paciente?.dni?.toString().trim();
+                              console.log('Abriendo historial para DNI:', cleanDni);
+                              setHistoryDni(cleanDni);
+                              setIsHistoryOpen(true);
+                            }}
                             title="Ver Historial"
                             className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-slate-100"
                           >
@@ -326,7 +329,7 @@ export default function MammographyList() {
 
         <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-700/30 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-slate-400 font-black uppercase tracking-widest">
-            SISTEMONCO <span className="mx-2">|</span> {total} REGISTROS ENCONTRADOS
+            ONCO - SISTEM <span className="mx-2">|</span> {total} REGISTROS ENCONTRADOS
           </span>
           <div className="flex items-center gap-3">
             <button
@@ -355,8 +358,7 @@ export default function MammographyList() {
         onClose={() => setIsModalOpen(false)}
         mammographyId={selectedId}
         onSuccess={() => {
-          setPage(1);
-          window.location.reload();
+          // Ya se invalida en useMutateMammography, no hace falta recargar
         }}
       />
 

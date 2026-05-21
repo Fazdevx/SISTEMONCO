@@ -1,6 +1,6 @@
-# Proyecto SISTEMONCO (Fase 1: Mamografías)
+# Proyecto ONCO - SISTEM (Fase 1: Mamografías)
 
-¡Hola! Aquí tienes el resumen técnico y funcional de cómo está construido SISTEMONCO y qué ventajas te ofrece ahora que estamos lanzando esta **Primera Fase enfocada exclusivamente en tamizaje de mamografías**.
+¡Hola! Aquí tienes el resumen técnico y funcional de cómo está construido ONCO - SISTEM y qué ventajas te ofrece ahora que estamos lanzando esta **Primera Fase enfocada exclusivamente en tamizaje de mamografías**.
 
 ---
 
@@ -33,11 +33,11 @@ En esta primera fase de mamografías, el sistema ya tiene todo esto listo para u
 
 ---
 
-## 3. SISTEMONCO vs. Excel (Por qué era necesario el cambio)
+## 3. ONCO - SISTEM vs. Excel (Por qué era necesario el cambio)
 
 Sabemos que Excel es útil para empezar, pero para gestionar salud se queda corto muy rápido. Aquí la diferencia de usar tu nuevo sistema:
 
-| Lo que pasaba en Excel ❌ | Lo que logras con SISTEMONCO ✅ |
+| Lo que pasaba en Excel ❌ | Lo que logras con ONCO - SISTEM ✅ |
 | :--- | :--- |
 | **Buscar era lento:** Tenías que hacer *Control+B*, filtrar columnas y podías borrar celdas por error. | **Búsqueda instantánea:** Escribes un DNI o nombre y te aparece el historial completo como una línea de tiempo limpia y protegida. |
 | **Gráficos manuales:** Para ver cómo ibas en el mes, tenías que seleccionar datos y armar tus propios gráficos. | **Dashboard automático:** El sistema calcula los totales, dibuja los gráficos y las barras de meta de avance de manera automática en tiempo real. |

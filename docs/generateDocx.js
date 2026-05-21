@@ -6,10 +6,10 @@ const path = require('path');
 async function generateDocx() {
   try {
     const mdContent = fs.readFileSync(path.join(__dirname, 'documento.md'), 'utf-8');
-    
+
     // Parse markdown to HTML
     const htmlString = marked.parse(mdContent);
-    
+
     const htmlWrap = `
       <!DOCTYPE html>
       <html>
@@ -39,8 +39,8 @@ async function generateDocx() {
       font: 'Calibri'
     });
 
-    fs.writeFileSync(path.join(__dirname, '..', 'Documentacion_SISTEMONCO.docx'), fileBuffer);
-    console.log('Documento DOCX generado exitosamente: Documentacion_SISTEMONCO.docx');
+    fs.writeFileSync(path.join(__dirname, '..', 'Documentacion_ONCO - SISTEM.docx'), fileBuffer);
+    console.log('Documento DOCX generado exitosamente: Documentacion_ONCO - SISTEM.docx');
   } catch (err) {
     console.error('Error generando DOCX:', err);
   }

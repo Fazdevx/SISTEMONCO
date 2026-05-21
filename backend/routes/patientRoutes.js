@@ -7,5 +7,6 @@ router.use(verifyToken);
 router.use(loadProfile);
 
 router.get('/:dni/history', patientController.getPatientHistory);
+router.put('/:id', patientController.updatePatient);
 
 module.exports = router;
