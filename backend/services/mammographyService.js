@@ -33,7 +33,7 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
       atencion:atenciones!inner(
         *,
         establecimiento:establecimientos(nombre, microred_id),
-        paciente:pacientes(*)
+        paciente:pacientes!inner(*)
       )
     `, { count: 'exact' });
 
@@ -60,11 +60,7 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
   
   if (filters.dni) {
     const q = `%${filters.dni}%`;
-    if (/^\d+$/.test(filters.dni)) {
-      query = query.ilike('atencion.paciente.dni', q);
-    } else {
-      query = query.ilike('atencion.paciente.nombres', q);
-    }
+    query = query.or(`dni.ilike.${q},nombres.ilike.${q}`, { foreignTable: 'atenciones.pacientes' });
   }
 
   if (filters.soloPositivos) {
