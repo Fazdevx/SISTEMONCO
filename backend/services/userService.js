@@ -11,6 +11,7 @@ const getUsers = async () => {
       rol,
       establecimiento_id,
       microred_id,
+      notificaciones_email,
       created_at,
       establecimiento:establecimientos(nombre),
       microred:microredes(nombre)
@@ -60,7 +61,7 @@ const createUser = async (email, password, nombres, rol, establecimiento_id, mic
 
 // Actualizar perfil de usuario
 const updateUser = async (userId, updateData) => {
-  const { email, nombres, rol, establecimiento_id, microred_id, password } = updateData;
+  const { email, nombres, rol, establecimiento_id, microred_id, password, notificaciones_email } = updateData;
 
   // 1. Actualizar datos en Auth (email y/o password)
   const authUpdates = {};
@@ -78,6 +79,7 @@ const updateUser = async (userId, updateData) => {
   if (rol !== undefined) profileUpdates.rol = rol;
   if (establecimiento_id !== undefined) profileUpdates.establecimiento_id = establecimiento_id || null;
   if (microred_id !== undefined) profileUpdates.microred_id = microred_id || null;
+  if (notificaciones_email !== undefined) profileUpdates.notificaciones_email = notificaciones_email;
 
   if (Object.keys(profileUpdates).length > 0) {
     const { error } = await supabase
@@ -108,6 +110,7 @@ const getUser = async (userId) => {
       rol,
       establecimiento_id,
       microred_id,
+      notificaciones_email,
       created_at,
       establecimiento:establecimientos(nombre),
       microred:microredes(nombre)

@@ -451,6 +451,8 @@ const processBatch = async (recordsBatch) => {
   
   const insertedMammographies = await insertMammographyBatch(mammographyData);
   console.log(`      ✅ Mamografías insertadas: ${insertedMammographies.length}`);
+
+  
   
   return {
     importedPatients: insertedPatients.length,

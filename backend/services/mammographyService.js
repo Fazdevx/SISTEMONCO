@@ -1,5 +1,6 @@
 // services/mammographyService.js
 const supabase = require('../config/supabase');
+const { notifyPositiveCases } = require('./notificationService');
 
 const insertMammographyBatch = async (mammographyData) => {
   if (!mammographyData || mammographyData.length === 0) {
@@ -179,6 +180,21 @@ const updateMammography = async (id, updateData) => {
       .update(finalMammoData)
       .eq('id', id);
     if (mammoError) throw mammoError;
+
+    // 🔔 Notificar si el BI-RADS actualizado es positivo
+    if (finalMammoData.birads_mx) {
+      const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
+      if (POSITIVOS_REGEX.test(finalMammoData.birads_mx)) {
+        // Obtener datos del paciente para el correo
+        const current = await getMammographyById(id);
+        const positiveCase = [{
+          dni: current.atencion?.paciente?.dni,
+          nombres: current.atencion?.paciente?.nombres,
+          birads_mx: finalMammoData.birads_mx
+        }];
+        notifyPositiveCases(positiveCase).catch(err => console.error('Error enviando notificación (update):', err));
+      }
+    }
   }
 
   return { success: true };
@@ -238,6 +254,18 @@ const createMammography = async (data) => {
     .single();
   if (mError) throw mError;
 
+  // 🔔 Notificar si es un caso positivo
+  const birads_mx = birads ? `BI-RADS ${birads}` : null;
+  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
+  if (birads_mx && POSITIVOS_REGEX.test(birads_mx)) {
+    const positiveCase = [{
+      dni,
+      nombres,
+      birads_mx
+    }];
+    notifyPositiveCases(positiveCase).catch(err => console.error('Error enviando notificación (create):', err));
+  }
+
   return newMammo;
 };
 
@@ -269,10 +297,7 @@ const deleteMammography = async (id) => {
   return { success: true };
 };
 
-// services/mammographyService.js (añadir al final)
-
 // Helper: Supabase devuelve máximo 1000 filas por defecto.
-// Esta función pagina automáticamente para obtener TODOS los registros.
 const fetchAllRows = async (queryBuilder) => {
   const PAGE_SIZE = 1000;
   let allData = [];
@@ -299,10 +324,7 @@ const getDashboardStats = async (filters = {}) => {
   // Total atenciones
   let query1 = supabase.from('atenciones').select('*', { count: 'exact', head: true });
   if (establecimiento_id) query1 = query1.eq('establecimiento_id', establecimiento_id);
-  if (microred_id) query1 = query1.eq('establecimientos.microred_id', microred_id); // Requiere join si filtramos por microred en atenciones
   
-  // Para filtrar atenciones por microred_id, necesitamos un join o una subquery. 
-  // Usamos inner join con establecimientos si hay microred_id.
   if (microred_id) {
     query1 = supabase
       .from('atenciones')
@@ -313,7 +335,7 @@ const getDashboardStats = async (filters = {}) => {
   const { count: totalAtenciones, error: err1 } = await query1;
   if (err1) throw err1;
 
-  // Total pacientes únicos (usar paginación para obtener todos)
+  // Total pacientes únicos
   let finalTotalPacientes = 0;
   if (establecimiento_id || microred_id) {
     let queryPacs = supabase.from('atenciones').select('paciente_id');
@@ -333,7 +355,7 @@ const getDashboardStats = async (filters = {}) => {
     finalTotalPacientes = count;
   }
 
-  // Total positivas (pacientes únicos)
+  // Total positivas
   let query3 = supabase
     .from('detalle_mamografia')
     .select(`
@@ -344,7 +366,7 @@ const getDashboardStats = async (filters = {}) => {
         paciente:pacientes(dni)
       )
     `)
-    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%,birads_mx.ilike.birads: 4%,birads_mx.ilike.birads: 5%,birads_mx.ilike.birads: 6%');
+    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%');
   
   if (establecimiento_id) {
     query3 = query3.eq('atencion.establecimiento_id', establecimiento_id);
@@ -366,7 +388,7 @@ const getDashboardStats = async (filters = {}) => {
 
   const porcentajePositivas = totalAtenciones ? ((totalPositivas / totalAtenciones) * 100).toFixed(2) : 0;
 
-  // Atenciones por mes (últimos 6 meses)
+  // Atenciones por mes
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
@@ -387,14 +409,12 @@ const getDashboardStats = async (filters = {}) => {
       .order('fecha');
   }
 
-  const atencionesPorMes = await fetchAllRows(query4);
-
+  const atencionesPorMesArray = await fetchAllRows(query4);
   const meses = {};
-  atencionesPorMes.forEach(row => {
+  atencionesPorMesArray.forEach(row => {
     const mes = row.fecha.slice(0, 7);
     meses[mes] = (meses[mes] || 0) + 1;
   });
-  const atencionesPorMesArray = Object.entries(meses).map(([mes, cantidad]) => ({ mes, cantidad }));
 
   // Distribución BI-RADS
   let query5 = supabase
@@ -416,37 +436,25 @@ const getDashboardStats = async (filters = {}) => {
   const distribucionBirads = {};
   biradsDist.forEach(row => {
     let raw = (row.birads_mx || '').trim().toUpperCase();
-    if (!raw) {
-      distribucionBirads['SIN ESPECIFICAR'] = (distribucionBirads['SIN ESPECIFICAR'] || 0) + 1;
-      return;
-    }
+    if (!raw) return;
     let label = raw;
     const match = raw.match(/BI-RADS\s*[:\s]*([0-6][ABC]?)/i);
-    if (match) {
-      label = `BI-RADS ${match[1]}`;
-    } else if (/^[0-6][ABC]?$/.test(raw)) {
-      label = `BI-RADS ${raw}`;
-    }
+    if (match) label = `BI-RADS ${match[1]}`;
     distribucionBirads[label] = (distribucionBirads[label] || 0) + 1;
   });
 
   // Establecimientos
-  const { data: allEstsDB, error: err6 } = await supabase
+  const { data: allEstsDB } = await supabase
     .from('establecimientos')
     .select('id, nombre, meta_anual, microred_id, microred:microredes(nombre)');
-  if (err6) throw err6;
 
-  // Obtener TODAS las atenciones para contar por establecimiento (sin límite de 1000)
   let query7 = supabase.from('atenciones').select('establecimiento_id');
   if (establecimiento_id) query7 = query7.eq('establecimiento_id', establecimiento_id);
-  // Si hay microred, filtramos en el map posterior con allEstsDB
   const counts = await fetchAllRows(query7);
 
   const atencionesMap = {};
   counts.forEach(c => {
-    if (c.establecimiento_id) {
-      atencionesMap[c.establecimiento_id] = (atencionesMap[c.establecimiento_id] || 0) + 1;
-    }
+    if (c.establecimiento_id) atencionesMap[c.establecimiento_id] = (atencionesMap[c.establecimiento_id] || 0) + 1;
   });
 
   const allEstablecimientos = allEstsDB
@@ -456,22 +464,21 @@ const getDashboardStats = async (filters = {}) => {
       return true;
     })
     .map(est => ({
+      id: est.id,
       nombre: est.nombre,
       microred: est.microred?.nombre || 'SIN MICRORED',
       cantidad: atencionesMap[est.id] || 0,
       meta: est.meta_anual || 0
     })).sort((a, b) => b.cantidad - a.cantidad);
 
-  const topEstablecimientos = allEstablecimientos.slice(0, 5);
-
   return {
     totalAtenciones,
     totalPacientes: finalTotalPacientes,
     totalPositivas,
     porcentajePositivas,
-    atencionesPorMes: atencionesPorMesArray,
+    atencionesPorMes: Object.entries(meses).map(([mes, cantidad]) => ({ mes, cantidad })),
     distribucionBirads,
-    topEstablecimientos,
+    topEstablecimientos: allEstablecimientos.slice(0, 5),
     allEstablecimientos
   };
 };

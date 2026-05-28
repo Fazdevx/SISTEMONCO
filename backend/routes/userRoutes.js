@@ -5,12 +5,19 @@ const { verifyToken, loadProfile, requireRole } = require('../middleware/auth');
 
 router.use(verifyToken);
 router.use(loadProfile);
-router.use(requireRole(['admin'])); // Solo admin puede gestionar usuarios
 
-router.get('/', userController.listUsers);
+// Rutas accesibles por el propio usuario o admin
 router.get('/:id', userController.getUser);
-router.post('/', userController.createUser);
-router.put('/:id', userController.updateUser);
-router.delete('/:id', userController.deleteUser);
+router.put('/:id', (req, res, next) => {
+  if (req.user.rol === 'admin' || req.params.id === req.user.id) {
+    return userController.updateUser(req, res);
+  }
+  return res.status(403).json({ error: 'Forbidden' });
+});
+
+// Rutas exclusivas de administrador
+router.get('/', requireRole(['admin']), userController.listUsers);
+router.post('/', requireRole(['admin']), userController.createUser);
+router.delete('/:id', requireRole(['admin']), userController.deleteUser);
 
 module.exports = router;

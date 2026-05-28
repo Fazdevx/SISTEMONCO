@@ -51,7 +51,7 @@ export default function Settings() {
     weeklyReport: false
   });
 
-  const updateNotificationSetting = (id: string, value: any) => {
+  const updateNotificationSetting = async (id: string, value: any) => {
     if (id === 'position') {
       setToastPosition(value);
       toast.success(`Posición cambiada a ${value}`, { position: value as any });
@@ -59,8 +59,20 @@ export default function Settings() {
       setToastDuration(value);
       toast.success(`Duración ajustada a ${value}ms`, { duration: value });
     } else {
+      const prevValue = notifications[id];
       setNotifications(prev => ({ ...prev, [id]: value }));
-      toast.success(`${id === 'email' ? 'Correo' : id === 'push' ? 'Push' : 'Reporte'} ${value ? 'activado' : 'desactivado'}`);
+      
+      if (id === 'email') {
+        try {
+          await userApi.update(user.id, { notificaciones_email: value });
+          toast.success(`Notificaciones por correo ${value ? 'activadas' : 'desactivadas'}`);
+        } catch (error) {
+          setNotifications(prev => ({ ...prev, [id]: prevValue }));
+          toast.error('Error al guardar la preferencia');
+        }
+      } else {
+        toast.success(`${id === 'email' ? 'Correo' : id === 'push' ? 'Push' : 'Reporte'} ${value ? 'activado' : 'desactivado'}`);
+      }
     }
   };
 
@@ -79,6 +91,13 @@ export default function Settings() {
             nombres: currentProfile?.nombres || '',
             email: currentUser.email || ''
           });
+
+          if (currentProfile) {
+            setNotifications(prev => ({
+              ...prev,
+              email: !!currentProfile.notificaciones_email
+            }));
+          }
         }
       } catch (err) {
         console.error('Error cargando datos:', err);
