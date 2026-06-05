@@ -10,6 +10,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Target,
+  FileSpreadsheet
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
@@ -20,9 +21,13 @@ export default function Sidebar({ onLogout }) {
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/" },
     { icon: ClipboardList, label: "Mamografías", path: "/mamografias" },
+    { icon: Users, label: "Pacientes", path: "/pacientes" },
     { icon: AlertTriangle, label: "Casos Positivos", path: "/casos-positivos" },
     { icon: Target, label: "Metas", path: "/metas" },
-    ...(isAdmin ? [{ icon: Users, label: "Usuarios", path: "/usuarios" }] : []),
+    ...(isAdmin ? [
+      { icon: FileSpreadsheet, label: "Importación", path: "/importacion" },
+      { icon: Users, label: "Usuarios", path: "/usuarios" }
+    ] : []),
     { icon: Settings, label: "Configuración", path: "/configuracion" },
   ];
 

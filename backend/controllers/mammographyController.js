@@ -106,6 +106,8 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+const { stringify } = require('csv-stringify/sync');
+
 const exportMammographies = async (req, res) => {
   try {
     let { establecimiento_id, fecha_inicio, fecha_fin, birads, birads_mx, dni, soloPositivos } = req.query;
@@ -127,8 +129,30 @@ const exportMammographies = async (req, res) => {
       filters.establecimiento_id = establecimiento_id;
     }
     
-    const result = await mammographyService.getMammographies(filters, 1, 5000);
-    res.json(result.data);
+    // Obtenemos los datos (aumentamos el límite para exportación)
+    const result = await mammographyService.getMammographies(filters, 1, 10000);
+    const data = result.data;
+
+    // Formatear datos para el CSV
+    const rows = data.map(m => ({
+      DNI: m.atencion?.paciente?.dni || '',
+      Paciente: m.atencion?.paciente?.nombres || '',
+      Fecha: m.atencion?.fecha || '',
+      'BI-RADS': m.birads_mx || '',
+      Establecimiento: m.atencion?.establecimiento?.nombre || '',
+      Telefono: m.atencion?.paciente?.telefono || '',
+      Resultado: (m.resultados_mx || '').replace(/\n/g, ' '),
+      Sugerencia: (m.sugerencia_mx || '').replace(/\n/g, ' ')
+    }));
+
+    const csvContent = stringify(rows, {
+      header: true,
+      columns: ['DNI', 'Paciente', 'Fecha', 'BI-RADS', 'Establecimiento', 'Telefono', 'Resultado', 'Sugerencia']
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=reporte_mamografias_${new Date().toISOString().split('T')[0]}.csv`);
+    res.status(200).send(csvContent);
   } catch (error) {
     console.error('--- ERROR EN EXPORT ---');
     console.error(error);

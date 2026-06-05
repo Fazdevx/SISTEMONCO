@@ -6,7 +6,9 @@ import Dashboard from './pages/Dashboard';
 import Metas from './pages/Metas';
 import UserList from './pages/UserList';
 import Settings from './pages/Settings';
+import ImportManagement from './pages/ImportManagement';
 import PositiveCases from './pages/PositiveCases';
+import PatientManagement from './pages/PatientManagement';
 import Sidebar from './components/Sidebar';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
@@ -60,6 +62,14 @@ function App() {
           }
         />
         <Route
+          path="/pacientes"
+          element={
+            <PrivateRoute>
+              <PatientManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/metas"
           element={
             <PrivateRoute>
@@ -80,6 +90,14 @@ function App() {
           element={
             <PrivateRoute>
               <Settings />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/importacion"
+          element={
+            <PrivateRoute>
+              <ImportManagement />
             </PrivateRoute>
           }
         />

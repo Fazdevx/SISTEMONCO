@@ -64,8 +64,13 @@ const normalizeDate = (value) => {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     
-    // Si el string contiene letras (como "BIOPSIA", "MASTECTOMÍA", "QUIMIOTERAPIA") -> null
-    if (/[a-zA-Z]/i.test(trimmed) && !/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed) && !/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    // Si el string contiene letras, pero NO es un formato conocido (dd/mm/yyyy, yyyy-mm-dd, o mmm-yy) -> null
+    const isKnownFormat = 
+      /^\d{2}\/\d{2}\/\d{4}$/.test(trimmed) || 
+      /^\d{4}-\d{2}-\d{2}/.test(trimmed) || 
+      /^[a-z]{3}-\d{2}$/i.test(trimmed);
+
+    if (/[a-zA-Z]/i.test(trimmed) && !isKnownFormat) {
       return null;
     }
     
@@ -79,21 +84,21 @@ const normalizeDate = (value) => {
       return null;
     }
     
+    // Formato "ene-26" (mes abreviado)
+    const monthNames = { 'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06', 'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12' };
+    const monthMatch = trimmed.toLowerCase().match(/^([a-z]{3})-(\d{2})$/);
+    if (monthMatch) {
+      const month = monthNames[monthMatch[1]];
+      if (month) {
+        const year = `20${monthMatch[2]}`;
+        return new Date(`${year}-${month}-01`);
+      }
+    }
+
     // Formato "yyyy-mm-dd" o "yyyy-mm-dd HH:MM:SS"
     const date = new Date(trimmed);
     if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
       return date;
-    }
-    
-    // Formato "ene-26" (mes abreviado)
-    const monthNames = { 'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06', 'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12' };
-    const match = trimmed.toLowerCase().match(/^([a-z]{3})-(\d{2})$/);
-    if (match) {
-      const month = monthNames[match[1]];
-      if (month) {
-        const year = `20${match[2]}`;
-        return new Date(`${year}-${month}-01`);
-      }
     }
   }
   

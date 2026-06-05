@@ -26,6 +26,10 @@ export interface Mamografia {
   resultados_mx?: string;
   sugerencia_mx?: string;
   atencion: Atencion;
+  fue_llamado?: boolean;
+  fecha_biopsia?: string;
+  fue_referido?: boolean;
+  notas_seguimiento?: string;
 }
 
 export interface Usuario {

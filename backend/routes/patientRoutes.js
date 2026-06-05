@@ -6,6 +6,7 @@ const { verifyToken, loadProfile } = require('../middleware/auth');
 router.use(verifyToken);
 router.use(loadProfile);
 
+router.get('/', patientController.listPatients);
 router.get('/:dni/history', patientController.getPatientHistory);
 router.put('/:id', patientController.updatePatient);
 

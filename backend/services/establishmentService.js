@@ -1,61 +1,37 @@
 const supabase = require("../config/supabase");
 
 const establishmentCache = new Map();
+const dbMapping = new Map();
 
-// MAPEO DE NOMBRES (Excel → Base de datos)
-const ESTABLISHMENT_MAPPING = {
-  // Hospitales
-  "HOSPITAL REGIONAL DE HUACHO": "Hospital Regional Huacho",
-  "HOSPITAL DE CHANCAY": "Hospital de Chancay",
-  "HOSPITAL DE HUARAL": "Hospital de Huaral",
-  "CENTRO BASE HUARAL": "Centro Base Huaral",
-
-  // Centros de Salud
-  "C.S. EL SOCORRO": "C.S. EL SOCORRO",
-  "C. S. EL SOCORRO": "C.S. EL SOCORRO",
-  "C. S. VEGUETA": "C.S. VEGUETA",
-  "C. S. SAYAN": "C.S. SAYAN",
-
-  // Puestos de Salud
-  "P. S. SAN JUDAS TADEO": "P.S. SAN JUDAS TADEO",
-  "P.S. IC. MARIATEGUI": "P.S. MARIATEGUI",
-};
-
-const normalizeEstablishmentName = (nombreFromExcel) => {
-  if (!nombreFromExcel) return null;
-
-  // Limpiar y normalizar
-  let cleaned = nombreFromExcel.toString().trim().toUpperCase();
-
-  // Buscar en el mapeo
-  for (let [excelName, dbName] of Object.entries(ESTABLISHMENT_MAPPING)) {
-    if (excelName === cleaned) {
-      return dbName;
-    }
-  }
-
-  // Si no hay mapeo, devolver el nombre original
-  return nombreFromExcel.toString().trim();
-};
-
-// CARGAR TODOS LOS ESTABLECIMIENTOS
+// CARGAR TODOS LOS ESTABLECIMIENTOS Y SUS MAPEOS
 const loadEstablishmentsCache = async () => {
   try {
-    const { data, error } = await supabase
+    // 1. Cargar establecimientos base
+    const { data: ests, error: estErr } = await supabase
       .from("establecimientos")
       .select("id, nombre");
 
-    if (error) throw error;
+    if (estErr) throw estErr;
 
     establishmentCache.clear();
-
-    for (const establishment of data) {
-      const normalizedName = establishment.nombre.toUpperCase().trim();
-      establishmentCache.set(normalizedName, establishment.id);
+    for (const est of ests) {
+      establishmentCache.set(est.nombre.toUpperCase().trim(), est.id);
     }
 
-    console.log(`✅ Establecimientos cargados: ${data.length}`);
-    return data.length;
+    // 2. Cargar mapeos dinámicos desde la DB
+    const { data: mappings, error: mapErr } = await supabase
+      .from("establecimiento_mapeos")
+      .select("nombre_excel, establecimiento_id");
+
+    if (!mapErr && mappings) {
+      dbMapping.clear();
+      for (const m of mappings) {
+        dbMapping.set(m.nombre_excel.toUpperCase().trim(), m.establecimiento_id);
+      }
+    }
+
+    console.log(`✅ Establecimientos cargados: ${ests.length}. Mapeos: ${mappings?.length || 0}`);
+    return ests.length;
   } catch (error) {
     console.error("❌ Error cargando establecimientos:", error);
     throw error;
@@ -65,26 +41,14 @@ const loadEstablishmentsCache = async () => {
 const getEstablishmentId = (nombreFromExcel) => {
   if (!nombreFromExcel) return null;
 
-  // 🔧 CORREGIDO: usar establishmentCache (sin 's')
-  if (!establishmentCache || establishmentCache.size === 0) {
-    console.error("❌ establishmentCache no ha sido cargado todavía");
-    return null;
-  }
+  const cleaned = nombreFromExcel.toString().trim().toUpperCase();
 
-  // Normalizar el nombre usando el mapeo
-  const normalizedName = normalizeEstablishmentName(nombreFromExcel);
+  // 1. Buscar en mapeos dinámicos (DB) - Prevalecen sobre el nombre exacto
+  if (dbMapping.has(cleaned)) return dbMapping.get(cleaned);
 
-  // Buscar en cache (case insensitive)
-  for (let [dbName, id] of establishmentCache.entries()) {
-    if (dbName.toLowerCase() === normalizedName.toLowerCase()) {
-      return id;
-    }
-  }
+  // 2. Buscar en nombres base (nombre exacto)
+  if (establishmentCache.has(cleaned)) return establishmentCache.get(cleaned);
 
-  // Log para debugging
-  console.log(
-    `⚠️ Establecimiento no encontrado: "${nombreFromExcel}" → normalizado: "${normalizedName}"`,
-  );
   return null;
 };
 
@@ -93,16 +57,7 @@ const getAllEstablishmentNames = () => {
 };
 
 const updateEstablishmentMeta = async (nombreFromExcel, metaAnual) => {
-  const normalizedName = normalizeEstablishmentName(nombreFromExcel);
-
-  // Buscar el ID en cache
-  let establishmentId = null;
-  for (let [dbName, id] of establishmentCache.entries()) {
-    if (dbName.toLowerCase() === normalizedName.toLowerCase()) {
-      establishmentId = id;
-      break;
-    }
-  }
+  const establishmentId = getEstablishmentId(nombreFromExcel);
 
   if (!establishmentId) return null;
 
@@ -141,8 +96,6 @@ module.exports = {
   getEstablishmentId,
   getAllEstablishmentNames,
   establishmentCache,
-  normalizeEstablishmentName,
-  ESTABLISHMENT_MAPPING,
   updateEstablishmentMeta,
   updateEstablishmentMetaById,
 };

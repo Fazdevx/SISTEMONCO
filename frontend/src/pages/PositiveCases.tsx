@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { mammographyApi, establishmentApi } from "../../services/api";
+import { mammographyApi } from "../../services/api";
 import {
   AlertTriangle,
   Search,
@@ -8,7 +8,6 @@ import {
   Calendar,
   Activity,
   Building2,
-  Phone,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -16,6 +15,9 @@ import {
   RefreshCw,
   X,
   History,
+  PhoneCall,
+  CalendarClock,
+  ExternalLink,
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,7 +25,7 @@ import PatientHistoryModal from "../components/PatientHistoryModal";
 import { Mamografia } from "../types";
 import {
   usePositiveCases,
-  useMammographyExport,
+  useMutateMammography,
 } from "../hooks/queries/useMammographies";
 import { useEstablecimientos } from "../hooks/queries/useEstablishments";
 import { useMemo } from "react";
@@ -62,20 +64,34 @@ export default function PositiveCases() {
   const LIMIT = 15;
 
   const { data: establecimientos = [] } = useEstablecimientos();
+  const { mutate: updateMammography } = useMutateMammography();
 
   const apiFilters = useMemo(() => {
-    const f: any = { soloPositivos: true };
-    if (!isAdmin && perfil?.establecimiento_id) {
+    const f: any = { 
+      soloPositivos: true,
+      dni: debouncedSearch,
+      birads_mx: filterBirads
+    };
+
+    if (isAdmin) {
+      if (filterEstablecimiento) {
+        const est = establecimientos.find((e: any) => e.nombre === filterEstablecimiento);
+        if (est) f.establecimiento_id = est.id;
+      }
+    } else if (perfil?.establecimiento_id) {
       f.establecimiento_id = perfil.establecimiento_id;
     }
     return f;
-  }, [isAdmin, perfil]);
+  }, [isAdmin, perfil, debouncedSearch, filterBirads, filterEstablecimiento, establecimientos]);
 
   const {
-    data: rawPositivos = [],
+    data: paginatedPositivos,
     isLoading: loading,
     refetch,
-  } = usePositiveCases(apiFilters);
+  } = usePositiveCases(page, LIMIT, apiFilters);
+
+  const cases = paginatedPositivos?.data || [];
+  const total = paginatedPositivos?.total || 0;
 
   // Historial Paciente
   const [historyDni, setHistoryDni] = useState<string | null>(null);
@@ -95,12 +111,10 @@ export default function PositiveCases() {
 
   useEffect(() => {
     if (
-      rawPositivos &&
-      Array.isArray(rawPositivos) &&
-      rawPositivos.length > 0
+      total > 0 && page === 1
     ) {
       toast(
-        `Alerta: Tienes ${rawPositivos.length} casos positivos que requieren seguimiento prioritario.`,
+        `Alerta: Tienes ${total} casos positivos que requieren seguimiento prioritario.`,
         {
           icon: "🚨",
           duration: 6000,
@@ -113,65 +127,7 @@ export default function PositiveCases() {
         },
       );
     }
-  }, [!!rawPositivos]);
-
-  const filteredAndSortedCases = useMemo(() => {
-    const list = Array.isArray(rawPositivos)
-      ? rawPositivos
-      : Array.isArray(rawPositivos?.data)
-        ? rawPositivos.data
-        : [];
-    let positivos = list.filter((m: Mamografia) =>
-      POSITIVOS_REGEX.test((m.birads_mx || "").trim()),
-    );
-
-    const seen = new Map();
-    positivos.sort((a: Mamografia, b: Mamografia) => {
-      const dateA = a.atencion?.fecha
-        ? new Date(a.atencion.fecha).getTime()
-        : 0;
-      const dateB = b.atencion?.fecha
-        ? new Date(b.atencion.fecha).getTime()
-        : 0;
-      return dateB - dateA;
-    });
-    positivos.forEach((m: Mamografia) => {
-      const dni = m.atencion?.paciente?.dni;
-      if (dni && !seen.has(dni)) {
-        seen.set(dni, m);
-      } else if (!dni) {
-        seen.set(`nodni_${m.id}`, m);
-      }
-    });
-    positivos = Array.from(seen.values());
-
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      positivos = positivos.filter(
-        (m: Mamografia) =>
-          m.atencion?.paciente?.nombres?.toLowerCase().includes(q) ||
-          m.atencion?.paciente?.dni?.includes(q),
-      );
-    }
-
-    if (filterBirads) {
-      positivos = positivos.filter(
-        (m: Mamografia) => extraerBirads(m.birads_mx) === filterBirads,
-      );
-    }
-
-    if (filterEstablecimiento) {
-      positivos = positivos.filter(
-        (m: Mamografia) =>
-          m.atencion?.establecimiento?.nombre === filterEstablecimiento,
-      );
-    }
-    return positivos;
-  }, [rawPositivos, debouncedSearch, filterBirads, filterEstablecimiento]);
-
-  const total = filteredAndSortedCases.length;
-  const from = (page - 1) * LIMIT;
-  const cases = filteredAndSortedCases.slice(from, from + LIMIT);
+  }, [total]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -185,41 +141,10 @@ export default function PositiveCases() {
 
   const handleExport = async () => {
     try {
-      const filters: any = { soloPositivos: true };
-      if (debouncedSearch) filters.dni = debouncedSearch;
-      if (filterBirads) filters.birads_mx = filterBirads;
-      if (!isAdmin && perfil?.establecimiento_id) {
-        filters.establecimiento_id = perfil.establecimiento_id;
-      }
-
+      const filters: any = { ...apiFilters };
       const res = await mammographyApi.export(filters);
-      let data: Mamografia[] = res.data;
-
-      data = data.filter((m) =>
-        POSITIVOS_REGEX.test((m.birads_mx || "").trim()),
-      );
-
-      const headers = [
-        "DNI",
-        "Paciente",
-        "Fecha",
-        "BI-RADS",
-        "Establecimiento",
-        "Teléfono",
-        "Resultado",
-      ];
-      const rows = data.map((m) => [
-        m.atencion?.paciente?.dni,
-        m.atencion?.paciente?.nombres,
-        m.atencion?.fecha,
-        m.birads_mx,
-        m.atencion?.establecimiento?.nombre,
-        m.atencion?.paciente?.telefono,
-        m.resultados_mx?.replace(/,/g, ";"),
-      ]);
-
-      const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      
+      const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
@@ -231,6 +156,7 @@ export default function PositiveCases() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error al exportar:", error);
       alert("No se pudo generar la exportación");
@@ -360,7 +286,7 @@ export default function PositiveCases() {
               <option key="all-establishments" value="">
                 {isAdmin ? "Todas las Sedes" : "Mi Sede"}
               </option>
-              {establecimientos.map((est) => (
+              {establecimientos.map((est: any) => (
                 <option key={est.id} value={est.nombre}>
                   {est.nombre}
                 </option>
@@ -403,7 +329,7 @@ export default function PositiveCases() {
                   Fecha Atención
                 </th>
                 <th className="px-8 py-5 text-[10px] font-black text-rose-400 dark:text-rose-500 uppercase tracking-[0.2em]">
-                  Contacto
+                  Seguimiento
                 </th>
                 <th className="px-8 py-5 text-[10px] font-black text-rose-400 dark:text-rose-500 uppercase tracking-[0.2em]">
                   Resultado MX
@@ -494,9 +420,52 @@ export default function PositiveCases() {
                         </td>
 
                         <td className="px-8 py-5">
-                          <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold">
-                            <Phone size={14} className="text-slate-300" />
-                            {m.atencion?.paciente?.telefono || "Sin teléfono"}
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() =>
+                                updateMammography({
+                                  id: m.id,
+                                  data: { fue_llamado: !m.fue_llamado },
+                                })
+                              }
+                              title={
+                                m.fue_llamado ? "Llamada realizada" : "Marcar como llamada realizada"
+                              }
+                              className={`p-2 rounded-xl transition-all ${m.fue_llamado ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-600"}`}
+                            >
+                              <PhoneCall size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const fecha = prompt("Fecha de cita para biopsia (AAAA-MM-DD):", m.fecha_biopsia || "");
+                                if (fecha !== null) {
+                                  updateMammography({
+                                    id: m.id,
+                                    data: { fecha_biopsia: fecha || null },
+                                  });
+                                }
+                              }}
+                              title={
+                                m.fecha_biopsia ? `Cita biopsia: ${m.fecha_biopsia}` : "Programar cita biopsia"
+                              }
+                              className={`p-2 rounded-xl transition-all ${m.fecha_biopsia ? "bg-indigo-100 text-indigo-600" : "bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-600"}`}
+                            >
+                              <CalendarClock size={16} />
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateMammography({
+                                  id: m.id,
+                                  data: { fue_referido: !m.fue_referido },
+                                })
+                              }
+                              title={
+                                m.fue_referido ? "Paciente referido" : "Marcar como referido"
+                              }
+                              className={`p-2 rounded-xl transition-all ${m.fue_referido ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-600"}`}
+                            >
+                              <ExternalLink size={16} />
+                            </button>
                           </div>
                         </td>
 

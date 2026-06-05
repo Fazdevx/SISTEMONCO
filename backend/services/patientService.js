@@ -7,29 +7,12 @@ const insertPatientsBatch = async (patientsData) => {
   }
 
   try {
-    // Verificar qué pacientes ya existen
-    const dnis = patientsData.map(p => p.dni);
-    const { data: existingPatients } = await supabase
+    // Usar upsert de Supabase para manejar inserciones y actualizaciones en una sola llamada
+    // onConflict: 'dni' le indica a Supabase que use el DNI para detectar duplicados
+    const { data, error } = await supabase
       .from('pacientes')
-      .select('dni, id')
-      .in('dni', dnis);
-
-    const existingDnis = new Map();
-    existingPatients?.forEach(p => {
-      existingDnis.set(p.dni, p.id);
-    });
-
-    // Separar nuevos vs existentes
-    const newPatients = patientsData.filter(p => !existingDnis.has(p.dni));
-    const patientsToUpdate = patientsData.filter(p => existingDnis.has(p.dni));
-
-    let insertedPatients = [];
-    
-    // ✅ INSERTAR NUEVOS PACIENTES CON TODOS LOS CAMPOS
-    if (newPatients.length > 0) {
-      const { data, error } = await supabase
-        .from('pacientes')
-        .insert(newPatients.map(p => ({
+      .upsert(
+        patientsData.map(p => ({
           dni: p.dni,
           nombres: p.nombres,
           edad: p.edad || null,
@@ -37,43 +20,17 @@ const insertPatientsBatch = async (patientsData) => {
           telefono: p.telefono || null,
           direccion: p.direccion || null,
           distrito: p.distrito || null
-        })))
-        .select();
+        })),
+        { onConflict: 'dni' }
+      )
+      .select();
 
-      if (error) throw error;
-      insertedPatients.push(...data);
-    }
-
-    // ✅ ACTUALIZAR PACIENTES EXISTENTES CON DATOS FALTANTES
-    for (const patient of patientsToUpdate) {
-      const updates = {};
-      if (patient.historia_clinica) updates.historia_clinica = patient.historia_clinica;
-      if (patient.telefono) updates.telefono = patient.telefono;
-      if (patient.direccion) updates.direccion = patient.direccion;
-      if (patient.distrito) updates.distrito = patient.distrito;
-      
-      if (Object.keys(updates).length > 0) {
-        const { data, error } = await supabase
-          .from('pacientes')
-          .update(updates)
-          .eq('dni', patient.dni)
-          .select();
-        
-        if (!error && data) {
-          insertedPatients.push(...data);
-        }
-      } else {
-        insertedPatients.push({
-          id: existingDnis.get(patient.dni),
-          dni: patient.dni,
-          nombres: patient.nombres
-        });
-      }
-    }
-
-    return insertedPatients;
+    if (error) throw error;
+    
+    console.log(`✅ Procesados ${data.length} pacientes vía upsert`);
+    return data;
   } catch (error) {
-    console.error('Error en insertPatientsBatch:', error);
+    console.error('Error en insertPatientsBatch (upsert):', error);
     throw error;
   }
 };
@@ -87,7 +44,38 @@ const updatePatient = async (id, updateData) => {
   return { success: true };
 };
 
+const getPatients = async (filters, page = 1, limit = 20) => {
+  let query = supabase
+    .from('pacientes')
+    .select('*', { count: 'exact' });
+
+  if (filters.search) {
+    const q = `%${filters.search}%`;
+    query = query.or(`dni.ilike.${q},nombres.ilike.${q}`);
+  }
+
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+  const { data, error, count } = await query.range(from, to).order('nombres');
+
+  if (error) throw error;
+  return { data, total: count, page, limit };
+};
+
+const getPatientById = async (id) => {
+  const { data, error } = await supabase
+    .from('pacientes')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
 module.exports = {
   insertPatientsBatch,
-  updatePatient
+  updatePatient,
+  getPatients,
+  getPatientById
 };

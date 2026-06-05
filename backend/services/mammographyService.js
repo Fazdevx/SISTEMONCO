@@ -65,23 +65,17 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
   }
 
   if (filters.soloPositivos) {
-    // Filtro inclusivo para 4, 5 y 6 en varios formatos
+    // Filtro inclusivo para 4, 5 y 6 en varios formatos (se hace en DB para permitir paginación real)
     query = query.or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%,birads_mx.ilike.birads: 4%,birads_mx.ilike.birads: 5%,birads_mx.ilike.birads: 6%');
   }
 
   const from = (page - 1) * limit;
   const to = from + limit - 1;
-  let { data, error, count } = await query.range(from, to);
+  let { data, error, count } = await query.range(from, to).order('id', { ascending: false });
 
   if (error) {
     console.error('Error en getMammographies query:', error);
     throw error;
-  }
-
-  if (filters.soloPositivos) {
-    const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
-    data = (data || []).filter(r => POSITIVOS_REGEX.test((r.birads_mx || '').trim()));
-    count = data.length;
   }
 
   return { data, total: count, page, limit };
@@ -467,9 +461,21 @@ const getDashboardStats = async (filters = {}) => {
       id: est.id,
       nombre: est.nombre,
       microred: est.microred?.nombre || 'SIN MICRORED',
+      microred_id: est.microred_id,
       cantidad: atencionesMap[est.id] || 0,
       meta: est.meta_anual || 0
     })).sort((a, b) => b.cantidad - a.cantidad);
+
+  // Comparativa por Microred
+  const comparativaMicroredes = {};
+  allEstablecimientos.forEach(est => {
+    const mrName = est.microred;
+    if (!comparativaMicroredes[mrName]) {
+      comparativaMicroredes[mrName] = { nombre: mrName, cantidad: 0, meta: 0 };
+    }
+    comparativaMicroredes[mrName].cantidad += est.cantidad;
+    comparativaMicroredes[mrName].meta += est.meta;
+  });
 
   return {
     totalAtenciones,
@@ -479,7 +485,8 @@ const getDashboardStats = async (filters = {}) => {
     atencionesPorMes: Object.entries(meses).map(([mes, cantidad]) => ({ mes, cantidad })),
     distribucionBirads,
     topEstablecimientos: allEstablecimientos.slice(0, 5),
-    allEstablecimientos
+    allEstablecimientos,
+    comparativaMicroredes: Object.values(comparativaMicroredes).sort((a, b) => b.cantidad - a.cantidad)
   };
 };
 

@@ -15,13 +15,40 @@ const getColumn = (row, possibleNames) => {
   }
   return null;
 };
+const supabase = require('../config/supabase');
+
+/**
+ * Obtiene el mapeo de columnas desde la base de datos o usa el fallback.
+ */
+const getDynamicMapping = async (rowSample, sheetName) => {
+  try {
+    const { data: dbMappings, error } = await supabase
+      .from('excel_columna_mapeos')
+      .select('campo_sistema, nombres_posibles');
+
+    if (error || !dbMappings) throw error || new Error('No mappings found');
+
+    const mapping = {};
+    dbMappings.forEach(m => {
+      mapping[m.campo_sistema] = m.nombres_posibles;
+    });
+
+    // Ajustes específicos por hoja (heredados por ahora)
+    if (sheetName === 'MAY') {
+      mapping.birads_mx = ['BI-RADS'];
+      mapping.birads_ecografia = ['BI-RADS_1', 'BI-RADS'];
+    }
+
+    return mapping;
+  } catch (err) {
+    console.warn('⚠️ No se pudo cargar mapeo de DB, usando fallback local.');
+    return detectColumnMapping(rowSample, sheetName);
+  }
+};
 
 /**
  * Detecta automáticamente el mapeo de columnas para una hoja dada,
- * basado en las columnas presentes.
- * @param {Object} rowSample - Una fila de muestra (primera fila con datos)
- * @param {string} sheetName - Nombre de la hoja (por si se requiere un caso especial)
- * @returns {Object} Mapeo de nombres de campos a lista de posibles nombres de columnas
+ * basado en las columnas presentes. (FALLBACK LOCAL)
  */
 const detectColumnMapping = (rowSample, sheetName) => {
   const columns = Object.keys(rowSample || {});
@@ -93,5 +120,6 @@ const getField = (row, mapping, field) => {
 module.exports = {
   getColumn,
   detectColumnMapping,
+  getDynamicMapping,
   getField
 };

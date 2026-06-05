@@ -23,13 +23,12 @@ export const useMammographiesList = (page: number, limit: number, filters: any) 
   });
 };
 
-export const usePositiveCases = (filters: any) => {
+export const usePositiveCases = (page: number, limit: number, filters: any) => {
   return useQuery({
-    queryKey: ['positiveCases', filters],
+    queryKey: ['positiveCases', { page, limit, filters }],
     queryFn: async () => {
-      // Pedimos un límite alto y filtramos en frontend, o pasamos a backend
-      const { data } = await mammographyApi.getAll(1, 1000, filters);
-      return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      const { data } = await mammographyApi.getAll(page, limit, filters);
+      return data;
     },
   });
 };

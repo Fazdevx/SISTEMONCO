@@ -1,8 +1,10 @@
 import axios from "axios";
 import { supabase } from "./supabase";
 
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+
 const api = axios.create({
-  baseURL: "http://localhost:3000/api",
+  baseURL: BASE_URL,
 });
 
 // Interceptor para agregar token JWT a las peticiones
@@ -46,12 +48,23 @@ export const mammographyApi = {
       {},
     );
     const params = new URLSearchParams(stringFilters);
-    return api.get(`/mammographies/export?${params.toString()}`);
+    return api.get(`/mammographies/export?${params.toString()}`, {
+      responseType: 'blob'
+    });
   },
 };
 
 export const patientApi = {
+  getAll: (page = 1, limit = 20, search = "") => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      search: search,
+    });
+    return api.get(`/patients?${params.toString()}`);
+  },
   getHistory: (dni) => api.get(`/patients/${dni}/history`),
+  update: (id, data) => api.put(`/patients/${id}`, data),
 };
 
 export const userApi = {
@@ -67,6 +80,19 @@ export const establishmentApi = {
   getEstablecimientos: () => api.get("/establecimientos/establecimientos"),
   updateMeta: (id: string | number, meta: number) =>
     api.put(`/establecimientos/${id}/meta`, { meta_anual: meta }),
+};
+
+export const mappingApi = {
+  getEstablecimientos: () => api.get("/mappings/establecimientos"),
+  createEstablecimiento: (data) => api.post("/mappings/establecimientos", data),
+  deleteEstablecimiento: (id) => api.delete(`/mappings/establecimientos/${id}`),
+  getColumnas: () => api.get("/mappings/columnas"),
+  updateColumna: (id, data) => api.put(`/mappings/columnas/${id}`, data),
+};
+
+export const importApi = {
+  getPreview: () => api.get("/import/preview"),
+  executeImport: () => api.post("/import/mammography"),
 };
 
 export default api;

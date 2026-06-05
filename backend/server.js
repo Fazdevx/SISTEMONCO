@@ -23,6 +23,7 @@ const mammographyRoutes = require('./routes/mammographyRoutes');
 const userRoutes = require('./routes/userRoutes');
 const establishmentRoutes = require('./routes/establishmentRoutes');
 const importRoutes = require('./routes/importRoutes');
+const mappingRoutes = require('./routes/mappingRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 
 // 3. Definición de Rutas
@@ -35,6 +36,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/microredes', establishmentRoutes);
 app.use('/api/establecimientos', establishmentRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/mappings', mappingRoutes);
 app.use('/import', importRoutes);
 
 // 4. Manejo de Errores

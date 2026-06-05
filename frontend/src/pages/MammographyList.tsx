@@ -98,21 +98,8 @@ export default function MammographyList() {
       if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
 
       const res = await mammographyApi.export(filters);
-      const data: Mamografia[] = res.data;
-
-      const headers = ['DNI', 'Paciente', 'Fecha', 'BI-RADS', 'Establecimiento', 'Resultado', 'Sugerencia'];
-      const rows = data.map((m: Mamografia) => [
-        m.atencion?.paciente?.dni,
-        m.atencion?.paciente?.nombres,
-        m.atencion?.fecha,
-        m.birads_mx,
-        m.atencion?.establecimiento?.nombre,
-        m.resultados_mx?.replace(/,/g, ';'),
-        m.sugerencia_mx?.replace(/,/g, ';')
-      ]);
-
-      const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
@@ -121,6 +108,8 @@ export default function MammographyList() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
       toast.success('Exportación generada con éxito');
     } catch (error) {
       console.error('Error al exportar:', error);

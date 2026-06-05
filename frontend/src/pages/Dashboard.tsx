@@ -14,7 +14,7 @@ import {
   Tooltip as ChartTooltip,
   Filler,
 } from "chart.js";
-import { Line, Doughnut } from "react-chartjs-2";
+import { Line, Doughnut, Bar } from "react-chartjs-2";
 import {
   Users,
   ClipboardList,
@@ -162,6 +162,24 @@ export default function Dashboard() {
           "#881337",
         ],
         borderWidth: 0,
+      },
+    ],
+  };
+
+  const microredData = {
+    labels: stats.comparativaMicroredes?.map((mr) => mr.nombre) || [],
+    datasets: [
+      {
+        label: "Tamizajes Realizados",
+        data: stats.comparativaMicroredes?.map((mr) => mr.cantidad) || [],
+        backgroundColor: "rgba(99, 102, 241, 0.8)",
+        borderRadius: 8,
+      },
+      {
+        label: "Meta Programada",
+        data: stats.comparativaMicroredes?.map((mr) => mr.meta) || [],
+        backgroundColor: "rgba(226, 232, 240, 0.8)",
+        borderRadius: 8,
       },
     ],
   };
