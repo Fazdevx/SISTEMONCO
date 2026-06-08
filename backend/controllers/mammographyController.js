@@ -89,12 +89,14 @@ const deleteMammography = async (req, res) => {
 // GET /api/stats/dashboard
 const getDashboardStats = async (req, res) => {
   try {
-    console.log('--- getDashboardStats USER ---', { id: req.user.id, rol: req.user.rol, est: req.user.establecimiento_id });
+    const { mes, establecimiento_id, microred_id } = req.query;
+    console.log('--- getDashboardStats FILTERS ---', { mes, establecimiento_id, microred_id });
     
-    // Determinar filtros según el rol
+    // Filtros base según el rol del usuario (seguridad)
     const filters = {
-      establecimiento_id: req.user.rol === 'establecimiento' ? req.user.establecimiento_id : null,
-      microred_id: req.user.rol === 'microred' ? req.user.microred_id : null
+      mes,
+      establecimiento_id: req.user.rol === 'establecimiento' ? req.user.establecimiento_id : establecimiento_id,
+      microred_id: req.user.rol === 'microred' ? req.user.microred_id : microred_id
     };
     
     const stats = await mammographyService.getDashboardStats(filters);

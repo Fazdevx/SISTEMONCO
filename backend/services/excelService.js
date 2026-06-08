@@ -39,9 +39,17 @@ const previewMammographyExcel = async (filePath) => {
   await loadEstablishmentsCache();
   const workbook = XLSX.readFile(filePath || "./uploads/MAMOGRAFIA 2026.xlsx");
 
-  const sheetsToProcess = workbook.SheetNames.filter((sheet) =>
-    VALID_SHEETS.includes(sheet.toUpperCase()),
-  );
+  const currentMonthIdx = new Date().getMonth();
+  const seenSheets = new Set();
+  const sheetsToProcess = workbook.SheetNames.filter((sheet) => {
+    const upper = sheet.toUpperCase();
+    const monthIdx = VALID_SHEETS.indexOf(upper);
+    if (monthIdx !== -1 && monthIdx <= currentMonthIdx && !seenSheets.has(upper)) {
+      seenSheets.add(upper);
+      return true;
+    }
+    return false;
+  });
 
   const preview = {
     totalRows: 0,
@@ -65,11 +73,15 @@ const previewMammographyExcel = async (filePath) => {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 1;
-      preview.totalRows++;
 
       const dniRaw = getField(row, mapping, "dni");
       const nombreRaw = getField(row, mapping, "nombres");
       const estRaw = getField(row, mapping, "establecimiento");
+
+      // SILENT SKIP: Si no hay DNI ni nombre, ignorar la fila sin reportar error (es basura del excel)
+      if (!dniRaw && (!nombreRaw || String(nombreRaw).trim() === "")) continue;
+
+      preview.totalRows++;
 
       if (!dniRaw) {
         preview.invalidRows++;
@@ -113,7 +125,7 @@ const previewMammographyExcel = async (filePath) => {
           sheet: sheetName,
           row: rowIndex,
           dni,
-          message: `Establecimiento no reconocido: "${estRaw}"`,
+          message: `Establecimiento no reconocido: "${estRaw || ""}"`,
         });
         continue;
       }
@@ -154,9 +166,17 @@ const processMammographyExcel = async (filePath) => {
     }
   }
 
-  const sheetsToProcess = workbook.SheetNames.filter((sheet) =>
-    VALID_SHEETS.includes(sheet.toUpperCase()),
-  );
+  const currentMonthIdx = new Date().getMonth();
+  const seenSheets = new Set();
+  const sheetsToProcess = workbook.SheetNames.filter((sheet) => {
+    const upper = sheet.toUpperCase();
+    const monthIdx = VALID_SHEETS.indexOf(upper);
+    if (monthIdx !== -1 && monthIdx <= currentMonthIdx && !seenSheets.has(upper)) {
+      seenSheets.add(upper);
+      return true;
+    }
+    return false;
+  });
   let totalImported = 0;
 
   for (const sheetName of sheetsToProcess) {
@@ -169,13 +189,24 @@ const processMammographyExcel = async (filePath) => {
     const recordsBatch = [];
 
     for (const row of rows) {
-      const dni = normalizeDni(getField(row, mapping, "dni"));
-      const nombres = normalizeText(getField(row, mapping, "nombres"));
+      const dniRaw = getField(row, mapping, "dni");
+      const nombreRaw = getField(row, mapping, "nombres");
+      
+      // Ignorar filas vacías silenciosamente
+      if (!dniRaw && (!nombreRaw || String(nombreRaw).trim() === "")) continue;
+
+      const dni = normalizeDni(dniRaw);
+      const nombres = normalizeText(nombreRaw);
       const estId = getEstablishmentId(
         getField(row, mapping, "establecimiento"),
       );
 
       if (isValidDni(dni) && isValidName(nombres) && estId) {
+        const fechaRecord =
+          normalizeDate(getField(row, mapping, "fecha_toma_mx")) ||
+          (row["FECHA "] ? normalizeDate(row["FECHA "]) : null) ||
+          new Date();
+
         recordsBatch.push({
           paciente: {
             dni,
@@ -189,7 +220,7 @@ const processMammographyExcel = async (filePath) => {
           atencion: {
             establecimiento_id: estId,
             campaña_id: 1,
-            fecha: new Date(),
+            fecha: fechaRecord,
             estado: "REGISTRADO",
           },
           mamografia: {
@@ -198,25 +229,55 @@ const processMammographyExcel = async (filePath) => {
             ).substring(0, 20),
             resultados_mx: normalizeText(getField(row, mapping, "resultados")),
             sugerencia_mx: normalizeText(getField(row, mapping, "sugerencia")),
-            fecha_toma_mx:
-              normalizeDate(getField(row, mapping, "fecha_toma_mx")) ||
-              (row["FECHA "] ? normalizeDate(row["FECHA "]) : null),
-            fecha_recepcion_resultados: normalizeDate(getField(row, mapping, "fecha_recepcion")),
-            fecha_recojo_resultados: normalizeDate(getField(row, mapping, "fecha_recojo")),
-            fecha_entrega: normalizeDate(getField(row, mapping, "fecha_entrega")),
-            cita_ecografia: normalizeText(getField(row, mapping, "cita_ecografia")),
-            resultados_ecografia: normalizeText(getField(row, mapping, "resultados_ecografia")),
-            birads_ecografia: normalizeText(getField(row, mapping, "birads_ecografia")),
-            sugerencias_ecografia: normalizeText(getField(row, mapping, "sugerencias_ecografia")),
-            fecha_toma_magnificacion: normalizeDate(getField(row, mapping, "fecha_toma_magnificacion")),
-            resultados_magnificacion: normalizeText(getField(row, mapping, "resultados_magnificacion")),
-            birads_magnificacion: normalizeText(getField(row, mapping, "birads_magnificacion")),
-            sugerencias_magnificacion: normalizeText(getField(row, mapping, "sugerencias_magnificacion")),
-            fecha_referencia_hrh: normalizeDate(getField(row, mapping, "fecha_referencia_hrh")),
-            procedimiento_fecha: normalizeDate(getField(row, mapping, "procedimiento_fecha")),
-            tratamiento_otra_institucion: normalizeText(getField(row, mapping, "tratamiento_otra")),
-            referencia_otra_institucion: normalizeText(getField(row, mapping, "referencia_otra")),
-            situacion_actual: normalizeText(getField(row, mapping, "situacion_actual")),
+            fecha_toma_mx: fechaRecord,
+            fecha_recepcion_resultados: normalizeDate(
+              getField(row, mapping, "fecha_recepcion"),
+            ),
+            fecha_recojo_resultados: normalizeDate(
+              getField(row, mapping, "fecha_recojo"),
+            ),
+            fecha_entrega: normalizeDate(
+              getField(row, mapping, "fecha_entrega"),
+            ),
+            cita_ecografia: normalizeText(
+              getField(row, mapping, "cita_ecografia"),
+            ),
+            resultados_ecografia: normalizeText(
+              getField(row, mapping, "resultados_ecografia"),
+            ),
+            birads_ecografia: normalizeText(
+              getField(row, mapping, "birads_ecografia"),
+            ),
+            sugerencias_ecografia: normalizeText(
+              getField(row, mapping, "sugerencias_ecografia"),
+            ),
+            fecha_toma_magnificacion: normalizeDate(
+              getField(row, mapping, "fecha_toma_magnificacion"),
+            ),
+            resultados_magnificacion: normalizeText(
+              getField(row, mapping, "resultados_magnificacion"),
+            ),
+            birads_magnificacion: normalizeText(
+              getField(row, mapping, "birads_magnificacion"),
+            ),
+            sugerencias_magnificacion: normalizeText(
+              getField(row, mapping, "sugerencias_magnificacion"),
+            ),
+            fecha_referencia_hrh: normalizeDate(
+              getField(row, mapping, "fecha_referencia_hrh"),
+            ),
+            procedimiento_fecha: normalizeDate(
+              getField(row, mapping, "procedimiento_fecha"),
+            ),
+            tratamiento_otra_institucion: normalizeText(
+              getField(row, mapping, "tratamiento_otra"),
+            ),
+            referencia_otra_institucion: normalizeText(
+              getField(row, mapping, "referencia_otra"),
+            ),
+            situacion_actual: normalizeText(
+              getField(row, mapping, "situacion_actual"),
+            ),
           },
         });
 
@@ -238,21 +299,51 @@ const processMammographyExcel = async (filePath) => {
 };
 
 const processBatch = async (batch) => {
+  // Deduplicar el batch por DNI y Fecha para evitar duplicados en el mismo proceso
+  const uniqueBatchMap = new Map();
+  for (const item of batch) {
+    const dateStr =
+      item.atencion.fecha instanceof Date
+        ? item.atencion.fecha.toISOString().split("T")[0]
+        : item.atencion.fecha;
+    const key = `${item.paciente.dni}_${dateStr}`;
+    if (!uniqueBatchMap.has(key)) {
+      uniqueBatchMap.set(key, item);
+    }
+  }
+  const uniqueBatch = Array.from(uniqueBatchMap.values());
+
   const insertedPatients = await insertPatientsBatch(
-    batch.map((r) => r.paciente),
+    uniqueBatch.map((r) => r.paciente),
   );
   const patientIdByDni = new Map(insertedPatients.map((p) => [p.dni, p.id]));
 
-  const attentionsData = batch.map((r) => ({
+  const attentionsData = uniqueBatch.map((r) => ({
     ...r.atencion,
     paciente_id: patientIdByDni.get(r.paciente.dni),
   }));
   const insertedAttentions = await insertAttentionsBatch(attentionsData);
 
-  const mammographyData = batch.map((r, i) => ({
-    ...r.mamografia,
-    atencion_id: insertedAttentions[i].id,
-  }));
+  // Mapear IDs de atención de forma segura usando paciente_id y fecha
+  const attentionIdMap = new Map();
+  for (const att of insertedAttentions) {
+    const dateStr = new Date(att.fecha).toISOString().split("T")[0];
+    const key = `${att.paciente_id}_${dateStr}`;
+    attentionIdMap.set(key, att.id);
+  }
+
+  const mammographyData = uniqueBatch.map((r) => {
+    const pId = patientIdByDni.get(r.paciente.dni);
+    const dateStr =
+      r.atencion.fecha instanceof Date
+        ? r.atencion.fecha.toISOString().split("T")[0]
+        : r.atencion.fecha;
+    const key = `${pId}_${dateStr}`;
+    return {
+      ...r.mamografia,
+      atencion_id: attentionIdMap.get(key),
+    };
+  });
   await insertMammographyBatch(mammographyData);
 
   return { importedAttentions: insertedAttentions.length };

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMammographyStats } from "../hooks/queries/useMammographies";
 import {
   Chart as ChartJS,
@@ -14,7 +14,7 @@ import {
   Tooltip as ChartTooltip,
   Filler,
 } from "chart.js";
-import { Line, Doughnut, Bar } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import {
   Users,
   ClipboardList,
@@ -24,13 +24,13 @@ import {
   CheckCircle2,
   ChevronRight,
   CalendarDays,
+  Activity
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "../contexts/ThemeContext";
 import AllEstablishmentsModal from "../components/AllEstablishmentsModal";
 import { getProgressColor, getProgressTextColor } from "../utils/colors";
 import toast from "react-hot-toast";
-import { useEffect } from "react";
 
 ChartJS.register(
   CategoryScale,
@@ -45,7 +45,7 @@ ChartJS.register(
   Filler,
 );
 
-const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
+const StatCard = ({ title, value, icon: Icon, color, percentage, isComparison }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -58,9 +58,22 @@ const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
       <h3 className="text-2xl font-bold mt-2 text-slate-800 dark:text-white">
         {value}
       </h3>
-      {percentage && (
-        <p className="text-xs mt-2 font-semibold text-rose-500 flex items-center gap-1">
-          <TrendingUp size={12} /> {percentage}% del total
+      {percentage !== undefined && (
+        <p className={`text-xs mt-2 font-semibold flex items-center gap-1 ${
+          isComparison 
+            ? (Number(percentage) >= 0 ? 'text-emerald-500' : 'text-rose-500')
+            : 'text-rose-500'
+        }`}>
+          {isComparison ? (
+            <>
+              {Number(percentage) >= 0 ? <TrendingUp size={12} /> : <TrendingUp size={12} className="rotate-180" />}
+              {percentage}% vs mes anterior
+            </>
+          ) : (
+            <>
+              <TrendingUp size={12} /> {percentage}% del total
+            </>
+          )}
         </p>
       )}
     </div>
@@ -71,23 +84,30 @@ const StatCard = ({ title, value, icon: Icon, color, percentage }) => (
 );
 
 export default function Dashboard() {
-  const { data: stats, isLoading: loading, error } = useMammographyStats();
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [filterEstablecimiento, setFilterEstablecimiento] = useState("");
+  
+  const { data: stats, isLoading: loading, error } = useMammographyStats({ 
+    mes: filterMonth,
+    establecimiento_id: filterEstablecimiento 
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isDark } = useTheme();
 
   useEffect(() => {
     if (stats) {
       const totalMetas = stats.allEstablecimientos.reduce(
-        (acc, est) => acc + (est.meta || 0),
+        (acc, est) => acc + (est.meta_anual || 0),
         0,
       );
       const percentage =
         totalMetas > 0
-          ? ((stats.totalAtenciones / totalMetas) * 100).toFixed(1)
+          ? ((stats.totalAtencionesAcumulado / totalMetas) * 100).toFixed(1)
           : 0;
 
       toast(
-        `Progreso General: ${stats.totalAtenciones} atendidos de una meta total de ${totalMetas} (${percentage}%)`,
+        `Progreso Anual: ${stats.totalAtencionesAcumulado} atendidos de una meta total de ${totalMetas} (${percentage}%)`,
         {
           icon: "📊",
           duration: 5000,
@@ -132,18 +152,21 @@ export default function Dashboard() {
       {
         label: "Atenciones",
         data: stats.atencionesPorMes.map((d) => d.cantidad),
-        borderColor: getComputedStyle(
-          document.documentElement,
-        ).getPropertyValue("--accent-primary"),
-        backgroundColor: getComputedStyle(
-          document.documentElement,
-        ).getPropertyValue("--accent-soft"),
+        borderColor: "#6366f1",
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, "rgba(99, 102, 241, 0.4)");
+          gradient.addColorStop(1, "rgba(99, 102, 241, 0)");
+          return gradient;
+        },
         fill: true,
         tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: getComputedStyle(
-          document.documentElement,
-        ).getPropertyValue("--accent-primary"),
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: "#6366f1",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
       },
     ],
   };
@@ -152,219 +175,287 @@ export default function Dashboard() {
     labels: Object.keys(stats.distribucionBirads),
     datasets: [
       {
+        label: "Casos",
         data: Object.values(stats.distribucionBirads),
         backgroundColor: [
-          "#94a3b8",
-          "#10b981",
-          "#f59e0b",
-          "#f97316",
-          "#ef4444",
-          "#881337",
+          "rgba(148, 163, 184, 0.8)", // 0
+          "rgba(16, 185, 129, 0.8)", // 1
+          "rgba(245, 158, 11, 0.8)", // 2
+          "rgba(249, 115, 22, 0.8)", // 3
+          "rgba(239, 68, 68, 0.8)",  // 4
+          "rgba(136, 19, 55, 0.8)",  // 5
         ],
+        borderRadius: 8,
         borderWidth: 0,
-      },
-    ],
-  };
-
-  const microredData = {
-    labels: stats.comparativaMicroredes?.map((mr) => mr.nombre) || [],
-    datasets: [
-      {
-        label: "Tamizajes Realizados",
-        data: stats.comparativaMicroredes?.map((mr) => mr.cantidad) || [],
-        backgroundColor: "rgba(99, 102, 241, 0.8)",
-        borderRadius: 8,
-      },
-      {
-        label: "Meta Programada",
-        data: stats.comparativaMicroredes?.map((mr) => mr.meta) || [],
-        backgroundColor: "rgba(226, 232, 240, 0.8)",
-        borderRadius: 8,
       },
     ],
   };
 
   const chartOptions = {
     maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
+    plugins: { 
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark ? "#1e293b" : "#fff",
+        titleColor: isDark ? "#fff" : "#1e293b",
+        bodyColor: isDark ? "#94a3b8" : "#64748b",
+        borderColor: isDark ? "#334155" : "#e2e8f0",
+        borderWidth: 1,
+        padding: 12,
+        boxPadding: 4,
+        usePointStyle: true,
+      }
+    },
     scales: {
       y: {
         beginAtZero: true,
-        grid: { color: gridColor },
-        ticks: { color: textColor },
+        grid: { color: gridColor, drawBorder: false },
+        ticks: { color: textColor, font: { size: 11, weight: '500' } },
       },
-      x: { grid: { display: false }, ticks: { color: textColor } },
+      x: { 
+        grid: { display: false }, 
+        ticks: { color: textColor, font: { size: 11, weight: '500' } } 
+      },
     },
-    metrics: [
-      {
-        title: "Exámenes Semanales",
-        value: stats?.semanal || 0,
-        icon: CalendarDays,
-        color: "bg-emerald-500",
-        percentage: 0,
-      },
-      {
-        title: "Exámenes Mensuales",
-        value: stats?.mensual || 0,
-        icon: CalendarDays,
-        color: "bg-blue-500",
-        percentage: 0,
-      },
-    ],
   };
 
   return (
     <div className="space-y-8 p-6  max-w-7xl mx-auto">
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 bg-accent/10 text-accent text-[10px] font-black uppercase tracking-wider rounded-md">Analytics Engine</span>
+          </div>
+          <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">
             Panel de Control
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Resumen general del sistema de tamizaje oncológico
+          <p className="text-slate-500 dark:text-slate-400 font-medium">
+            Monitoreo en tiempo real del tamizaje oncológico
           </p>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800">
-          <CheckCircle2 size={14} /> Sistema en línea
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Selector Establecimiento */}
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 pl-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight leading-none">Establecimiento</span>
+              <select
+                value={filterEstablecimiento}
+                onChange={(e) => setFilterEstablecimiento(e.target.value)}
+                className="bg-transparent border-none text-sm font-black text-slate-700 dark:text-slate-200 focus:ring-0 cursor-pointer pr-8 py-0"
+              >
+                <option value="">Todas las Sedes</option>
+                {stats?.establecimientosList?.map(est => (
+                  <option key={est.id} value={est.id} className="dark:bg-slate-800">{est.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded-xl">
+              <Building2 className="text-slate-400" size={20} />
+            </div>
+          </div>
+
+          {/* Selector Periodo */}
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 pl-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight leading-none">Periodo</span>
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="bg-transparent border-none text-sm font-black text-slate-700 dark:text-slate-200 focus:ring-0 cursor-pointer pr-8 py-0"
+              >
+                <option value="anual" className="dark:bg-slate-800">Todo el Año (2026)</option>
+                {[
+                  { val: '2026-01', label: 'Enero 2026' },
+                  { val: '2026-02', label: 'Febrero 2026' },
+                  { val: '2026-03', label: 'Marzo 2026' },
+                  { val: '2026-04', label: 'Abril 2026' },
+                  { val: '2026-05', label: 'Mayo 2026' },
+                  { val: '2026-06', label: 'Junio 2026' },
+                ].map(m => (
+                  <option key={m.val} value={m.val} className="dark:bg-slate-800">{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded-xl">
+              <CalendarDays className="text-slate-400" size={20} />
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
-          title="Atenciones Totales"
-          value={stats.totalAtenciones}
+          title={stats.isAnual ? "Atenciones Anuales" : `Atenciones en ${stats.mesSeleccionado}`}
+          value={stats.atencionesMes}
+          percentage={stats.isAnual ? undefined : stats.diferenciaMes}
+          isComparison={!stats.isAnual}
           icon={ClipboardList}
-          color="bg-accent"
+          color="bg-indigo-600"
         />
         <StatCard
-          title="Pacientes Únicos"
-          value={stats.totalPacientes}
-          icon={Users}
+          title="Productividad Anual"
+          value={stats.totalAtencionesAcumulado}
+          icon={TrendingUp}
           color="bg-emerald-600"
         />
         <StatCard
-          title="Resultados Positivos"
-          value={stats.totalPositivas}
-          percentage={stats.porcentajePositivas}
+          title={`BI-RADS 4 (${stats.isAnual ? "Anual" : stats.mesSeleccionado})`}
+          value={stats.totalPositivasMes}
           icon={AlertCircle}
           color="bg-rose-600"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Gráfico Tendencia */}
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
-          <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-8">
-            <TrendingUp size={18} className="text-accent" />
-            Tendencia de Atenciones
-          </h3>
-          <div className="h-[300px]">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="font-black text-slate-800 dark:text-white flex items-center gap-2 text-lg">
+                <TrendingUp size={20} className="text-indigo-600" />
+                Histórico de Tamizajes
+              </h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">
+                {stats.isAnual ? "Avance mensual durante todo el año" : "Comparativa de los últimos 6 meses"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+               <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
+               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Atenciones</span>
+            </div>
+          </div>
+          <div className="h-[320px]">
             <Line data={monthlyData} options={chartOptions} />
           </div>
         </div>
 
         {/* Gráfico BI-RADS */}
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
-          <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-8">
-            <AlertCircle size={18} className="text-rose-600" />
-            Distribución BI-RADS
-          </h3>
-          <div className="h-[300px] flex items-center justify-center">
-            <Doughnut
-              data={biradsData}
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <div className="mb-8">
+            <h3 className="font-black text-slate-800 dark:text-white flex items-center gap-2 text-lg">
+              <Activity size={20} className="text-rose-500" />
+              Categorías BI-RADS
+            </h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">Distribución {stats.isAnual ? "Anual 2026" : `de ${stats.mesSeleccionado}`}</p>
+          </div>
+          <div className="h-[320px]">
+            <Bar 
+              data={biradsData} 
               options={{
-                maintainAspectRatio: false,
-                cutout: "70%",
-                plugins: {
-                  legend: {
-                    position: "bottom",
-                    labels: {
-                      usePointStyle: true,
-                      padding: 20,
-                      color: textColor,
-                    },
-                  },
-                },
-              }}
+                ...chartOptions,
+                scales: {
+                  ...chartOptions.scales,
+                  x: { ...chartOptions.scales.x, grid: { display: false } }
+                }
+              }} 
             />
           </div>
         </div>
       </div>
 
-      {/* Top Establecimientos */}
-      <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
+      {/* Top Establecimientos / Avance */}
+      <div className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 transition-colors duration-300">
         <div className="flex justify-between items-center mb-8">
-          <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <Building2
-              size={18}
-              className="text-slate-500 dark:text-slate-400"
-            />
-            Productividad vs Metas (Top 5)
-          </h3>
+          <div>
+            <h3 className="font-black text-slate-800 dark:text-white flex items-center gap-2 text-lg">
+              <Building2
+                size={20}
+                className="text-indigo-600"
+              />
+              Resumen de Productividad por Sede
+            </h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">Avance real vs Meta programada ({stats.isAnual ? "Anual" : stats.mesSeleccionado})</p>
+          </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="text-accent hover:text-accent-hover text-sm font-bold flex items-center gap-1 transition-colors px-4 py-2 rounded-xl hover:bg-accent/5"
+            className="text-accent hover:text-accent-hover text-sm font-bold flex items-center gap-1 transition-colors px-4 py-2 rounded-xl hover:bg-accent/5 border border-transparent hover:border-accent/10"
           >
-            Ver más <ChevronRight size={16} />
+            Ver todas las sedes <ChevronRight size={16} />
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-          {stats.topEstablecimientos.map((est, idx) => {
-            const hasMeta = est.meta > 0;
-            const percentage = hasMeta
-              ? Math.min((est.cantidad / est.meta) * 100, 100)
-              : (est.cantidad / stats.totalAtenciones) * 100;
-            const progressColor = hasMeta
-              ? getProgressColor(percentage)
-              : "bg-slate-400";
-            const progressTextColor = hasMeta
-              ? getProgressTextColor(percentage)
-              : "text-slate-400";
 
-            return (
-              <div key={idx} className="relative group">
-                <div className="flex justify-between items-end mb-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-accent transition-colors">
-                      {est.nombre}
-                    </span>
-                    {hasMeta && (
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        Meta: {est.meta} tamizajes
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-lg font-black text-slate-800 dark:text-white leading-none">
-                      {est.cantidad}
-                    </span>
-                    {hasMeta && (
-                      <span
-                        className={`text-[10px] font-bold ${progressTextColor}`}
-                      >
-                        {percentage.toFixed(1)}% de la meta
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-4 overflow-hidden p-0.5 border border-slate-200/50 dark:border-slate-600/50">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percentage}%` }}
-                    transition={{
-                      duration: 1.2,
-                      ease: "easeOut",
-                      delay: idx * 0.1,
-                    }}
-                    className={`${progressColor} h-full rounded-full shadow-sm relative`}
+        <div className="overflow-x-auto -mx-2">
+          <table className="w-full text-left border-separate border-spacing-y-3">
+            <thead>
+              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">
+                <th className="pb-4 pl-4">Establecimiento</th>
+                {(stats?.availableMonths || []).map(m => (
+                  <th key={m} className="pb-4 text-center">{m.split('-')[1]}</th>
+                ))}
+                <th className="pb-4 text-center">Total</th>
+                <th className="pb-4 text-center">Meta</th>
+                <th className="pb-4 pr-4 text-right">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(stats?.allEstablecimientos || []).slice(0, 8).map((est, idx) => {
+                const totalReal = (est.avance_mensual || []).reduce((a, b) => a + b, 0);
+                const percentage = est.meta_anual > 0 ? (totalReal / est.meta_anual) * 100 : 0;
+                
+                // Indicador de estado
+                let statusIcon = <div className="w-2 h-2 rounded-full bg-slate-300" />;
+                let statusText = "Sin Meta";
+                let statusColor = "text-slate-400";
+                
+                if (est.meta_anual > 0) {
+                  if (percentage >= 90) {
+                    statusIcon = <CheckCircle2 size={14} className="text-emerald-500" />;
+                    statusText = "Excelente";
+                    statusColor = "text-emerald-600";
+                  } else if (percentage >= 50) {
+                    statusIcon = <TrendingUp size={14} className="text-amber-500" />;
+                    statusText = "En Progreso";
+                    statusColor = "text-amber-600";
+                  } else {
+                    statusIcon = <AlertCircle size={14} className="text-rose-500" />;
+                    statusText = "Crítico";
+                    statusColor = "text-rose-600";
+                  }
+                }
+
+                return (
+                  <motion.tr 
+                    key={est.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="group bg-slate-50/50 dark:bg-slate-900/20 hover:bg-white dark:hover:bg-slate-800 transition-all rounded-2xl shadow-sm"
                   >
-                    <div className="absolute inset-0 bg-white/20 animate-pulse-slow"></div>
-                  </motion.div>
-                </div>
-              </div>
-            );
-          })}
+                    <td className="py-4 pl-4 rounded-l-2xl">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 transition-colors">{est.nombre}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{est.microred}</span>
+                      </div>
+                    </td>
+                    {(est.avance_mensual || []).map((count, i) => (
+                      <td key={i} className="py-4 text-center text-xs font-bold text-slate-600 dark:text-slate-400">
+                        {count || "-"}
+                      </td>
+                    ))}
+                    <td className="py-4 text-center">
+                      <span className="text-xs font-black text-slate-800 dark:text-white bg-white dark:bg-slate-700 px-2 py-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-600">
+                        {totalReal}
+                      </span>
+                    </td>
+                    <td className="py-4 text-center text-xs font-bold text-slate-400">
+                      {est.meta_anual || "S/N"}
+                    </td>
+                    <td className="py-4 pr-4 text-right rounded-r-2xl">
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-1.5">
+                          {statusIcon}
+                          <span className={`text-[10px] font-black uppercase tracking-wider ${statusColor}`}>{statusText}</span>
+                        </div>
+                        <span className="text-[9px] font-bold text-slate-400">{percentage.toFixed(1)}% anual</span>
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -372,7 +463,8 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         establishments={stats.allEstablecimientos}
-        totalAtenciones={stats.totalAtenciones}
+        totalAtenciones={stats.totalAtencionesAcumulado}
+        mesSeleccionado={stats.mesSeleccionado}
       />
     </div>
   );

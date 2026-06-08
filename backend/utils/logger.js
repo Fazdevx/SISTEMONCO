@@ -1,43 +1,17 @@
-const fs = require('fs');
-
 const logError = ({
   file,
   sheet,
   row,
   message
 }) => {
-
-  const log = `
-[${new Date().toISOString()}]
-Archivo: ${file}
-Hoja: ${sheet}
-Fila: ${row}
-Error: ${message}
-
-`;
-
-  fs.appendFile(
-    './logs/errors.log',
-    log,
-    (error) => {
-
-      if (error) {
-        console.error(error);
-      }
-
-    }
-  );
-
+  const log = `[ERROR] [${new Date().toISOString()}] Archivo: ${file}, Hoja: ${sheet}, Fila: ${row}, Error: ${message}`;
+  console.error(log);
 };
+
 const logSuccess = (message) => {
-
-  fs.appendFile(
-    './logs/success.log',
-    `${new Date().toISOString()} - ${message}\n`,
-    () => {}
-  );
-
+  console.log(`[SUCCESS] [${new Date().toISOString()}] ${message}`);
 };
+
 module.exports = {
   logError,
   logSuccess

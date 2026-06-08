@@ -37,7 +37,7 @@ app.use('/api/microredes', establishmentRoutes);
 app.use('/api/establecimientos', establishmentRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/mappings', mappingRoutes);
-app.use('/import', importRoutes);
+app.use('/api/import', importRoutes);
 
 // 4. Manejo de Errores
 app.use((err, req, res, next) => {
@@ -48,7 +48,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor activo en puerto ${PORT}`);
-});
+module.exports = app;
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Servidor activo en puerto ${PORT}`);
+  });
+}

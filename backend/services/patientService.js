@@ -7,12 +7,10 @@ const insertPatientsBatch = async (patientsData) => {
   }
 
   try {
-    // Usar upsert de Supabase para manejar inserciones y actualizaciones en una sola llamada
-    // onConflict: 'dni' le indica a Supabase que use el DNI para detectar duplicados
-    const { data, error } = await supabase
-      .from('pacientes')
-      .upsert(
-        patientsData.map(p => ({
+    // Deduplicar pacientes por DNI en el mismo batch para evitar error de PostgreSQL
+    const uniquePatients = Array.from(
+      patientsData.reduce((map, p) => {
+        map.set(p.dni, {
           dni: p.dni,
           nombres: p.nombres,
           edad: p.edad || null,
@@ -20,14 +18,19 @@ const insertPatientsBatch = async (patientsData) => {
           telefono: p.telefono || null,
           direccion: p.direccion || null,
           distrito: p.distrito || null
-        })),
-        { onConflict: 'dni' }
-      )
+        });
+        return map;
+      }, new Map()).values()
+    );
+
+    const { data, error } = await supabase
+      .from('pacientes')
+      .upsert(uniquePatients, { onConflict: 'dni' })
       .select();
 
     if (error) throw error;
     
-    console.log(`✅ Procesados ${data.length} pacientes vía upsert`);
+    console.log(`✅ Procesados ${data.length} pacientes únicos vía upsert`);
     return data;
   } catch (error) {
     console.error('Error en insertPatientsBatch (upsert):', error);

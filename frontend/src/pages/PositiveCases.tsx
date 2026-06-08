@@ -32,7 +32,7 @@ import { useMemo } from "react";
 import toast from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 
-const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
+const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
 
 const extraerBirads = (raw: string | null | undefined) => {
   if (!raw) return null;
@@ -46,10 +46,6 @@ const getBiradsStyle = (birads: string | null) => {
   const b = birads.toUpperCase();
   if (b.includes("4"))
     return "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800";
-  if (b.includes("5"))
-    return "bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-700";
-  if (b.includes("6"))
-    return "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100";
   return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800";
 };
 
@@ -177,7 +173,7 @@ export default function PositiveCases() {
             </h1>
           </div>
           <p className="text-slate-500 dark:text-slate-400 ml-1">
-            Pacientes con BI-RADS 4, 5 o 6 — Seguimiento prioritario
+            Pacientes con BI-RADS 4 — Seguimiento prioritario
           </p>
         </div>
 
@@ -218,8 +214,7 @@ export default function PositiveCases() {
             Pacientes con resultado positivo en mamografía
           </p>
           <p className="text-rose-600 dark:text-rose-400 text-xs mt-1">
-            Se muestran casos únicos con BI-RADS 4 (A, B, C), 5 o 6. Los
-            duplicados son excluidos automáticamente. Requieren seguimiento
+            Se muestran casos con BI-RADS 4 (A, B, C). Requieren seguimiento
             médico prioritario.
           </p>
         </div>
@@ -499,7 +494,7 @@ export default function PositiveCases() {
 
         <div className="px-8 py-6 bg-rose-50/30 dark:bg-slate-700/30 border-t border-rose-100 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-slate-400 font-black uppercase tracking-widest">
-            {total} CASOS ÚNICOS POSITIVOS
+            {total} CASOS POSITIVOS
           </span>
           {totalPages > 1 && (
             <div className="flex items-center gap-3">

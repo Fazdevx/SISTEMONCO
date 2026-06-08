@@ -3,11 +3,11 @@ import { mammographyApi } from '../../../services/api';
 import { Mamografia } from '../../types';
 import toast from 'react-hot-toast';
 
-export const useMammographyStats = () => {
+export const useMammographyStats = (filters: any = {}) => {
   return useQuery({
-    queryKey: ['mammographyStats'],
+    queryKey: ['mammographyStats', filters],
     queryFn: async () => {
-      const { data } = await mammographyApi.getStats();
+      const { data } = await mammographyApi.getStats(filters);
       return data;
     },
   });

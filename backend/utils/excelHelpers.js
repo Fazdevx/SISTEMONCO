@@ -26,7 +26,9 @@ const getDynamicMapping = async (rowSample, sheetName) => {
       .from('excel_columna_mapeos')
       .select('campo_sistema, nombres_posibles');
 
-    if (error || !dbMappings) throw error || new Error('No mappings found');
+    if (error || !dbMappings || dbMappings.length === 0) {
+      throw error || new Error('No mappings found in database');
+    }
 
     const mapping = {};
     dbMappings.forEach(m => {

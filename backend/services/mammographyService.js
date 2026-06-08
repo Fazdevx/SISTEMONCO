@@ -59,14 +59,22 @@ const getMammographies = async (filters, page = 1, limit = 20) => {
     query = query.ilike('birads_mx', `%${filters.birads_mx}%`);
   }
   
+  if (filters.mes) {
+    // mes en formato YYYY-MM
+    const startOfMonth = `${filters.mes}-01`;
+    const date = new Date(startOfMonth);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+    query = query.gte('atencion.fecha', startOfMonth).lte('atencion.fecha', endOfMonth);
+  }
+  
   if (filters.dni) {
     const q = `%${filters.dni}%`;
     query = query.or(`dni.ilike.${q},nombres.ilike.${q}`, { foreignTable: 'atenciones.pacientes' });
   }
 
   if (filters.soloPositivos) {
-    // Filtro inclusivo para 4, 5 y 6 en varios formatos (se hace en DB para permitir paginación real)
-    query = query.or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%,birads_mx.ilike.birads: 4%,birads_mx.ilike.birads: 5%,birads_mx.ilike.birads: 6%');
+    // Filtro inclusivo para BI-RADS 4 (A, B, C)
+    query = query.or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.4%,birads_mx.ilike.birads: 4%');
   }
 
   const from = (page - 1) * limit;
@@ -177,7 +185,7 @@ const updateMammography = async (id, updateData) => {
 
     // 🔔 Notificar si el BI-RADS actualizado es positivo
     if (finalMammoData.birads_mx) {
-      const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
+      const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
       if (POSITIVOS_REGEX.test(finalMammoData.birads_mx)) {
         // Obtener datos del paciente para el correo
         const current = await getMammographyById(id);
@@ -250,7 +258,7 @@ const createMammography = async (data) => {
 
   // 🔔 Notificar si es un caso positivo
   const birads_mx = birads ? `BI-RADS ${birads}` : null;
-  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
+  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?4[ABC]?/i;
   if (birads_mx && POSITIVOS_REGEX.test(birads_mx)) {
     const positiveCase = [{
       dni,
@@ -313,122 +321,104 @@ const fetchAllRows = async (queryBuilder) => {
 };
 
 const getDashboardStats = async (filters = {}) => {
-  const { establecimiento_id, microred_id } = filters;
-
-  // Total atenciones
-  let query1 = supabase.from('atenciones').select('*', { count: 'exact', head: true });
-  if (establecimiento_id) query1 = query1.eq('establecimiento_id', establecimiento_id);
+  const { establecimiento_id, microred_id, mes } = filters;
+  const isAnual = mes === 'anual';
   
-  if (microred_id) {
-    query1 = supabase
-      .from('atenciones')
-      .select('id, establecimiento:establecimientos!inner(microred_id)', { count: 'exact', head: true })
-      .eq('establecimiento.microred_id', microred_id);
+  const targetMes = isAnual ? null : (mes || new Date().toISOString().slice(0, 7));
+  
+  let startOfMonth, endOfMonth, prevMes, startOfPrevMonth, endOfPrevMonth;
+  
+  if (!isAnual) {
+    const [year, month] = targetMes.split('-').map(Number);
+    startOfMonth = `${targetMes}-01`;
+    endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+    
+    const prevMonthDate = new Date(year, month - 2, 1);
+    prevMes = prevMonthDate.toISOString().slice(0, 7);
+    startOfPrevMonth = `${prevMes}-01`;
+    endOfPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).toISOString().split('T')[0];
   }
 
-  const { count: totalAtenciones, error: err1 } = await query1;
-  if (err1) throw err1;
+  // 1. TOTALES ACUMULADOS (Filtrados por sede si aplica)
+  let qTotal = supabase.from('atenciones').select('id, establecimiento:establecimientos!inner(microred_id)', { count: 'exact', head: true });
+  if (establecimiento_id) qTotal = qTotal.eq('establecimiento_id', establecimiento_id);
+  if (microred_id) qTotal = qTotal.eq('establecimiento.microred_id', microred_id);
+  const { count: totalAtenciones } = await qTotal;
 
-  // Total pacientes únicos
-  let finalTotalPacientes = 0;
-  if (establecimiento_id || microred_id) {
-    let queryPacs = supabase.from('atenciones').select('paciente_id');
-    if (establecimiento_id) queryPacs = queryPacs.eq('establecimiento_id', establecimiento_id);
-    if (microred_id) {
-      queryPacs = supabase.from('atenciones')
-                 .select('paciente_id, establecimiento:establecimientos!inner(microred_id)')
-                 .eq('establecimiento.microred_id', microred_id);
-    }
-    const pacs = await fetchAllRows(queryPacs);
-    finalTotalPacientes = new Set(pacs.map(p => p.paciente_id)).size;
+  // 2. ESTADÍSTICAS DEL PERIODO
+  let atencionesPeriodo = 0;
+  let atencionesPrev = 0;
+  
+  if (isAnual) {
+    atencionesPeriodo = totalAtenciones;
   } else {
-    const { count, error: err2 } = await supabase
-      .from('pacientes')
-      .select('*', { count: 'exact', head: true });
-    if (err2) throw err2;
-    finalTotalPacientes = count;
+    // Mes actual
+    let qMes = supabase.from('atenciones').select('id, establecimiento:establecimientos!inner(microred_id)', { count: 'exact', head: true }).gte('fecha', startOfMonth).lte('fecha', endOfMonth);
+    if (establecimiento_id) qMes = qMes.eq('establecimiento_id', establecimiento_id);
+    if (microred_id) qMes = qMes.eq('establecimiento.microred_id', microred_id);
+    const { count: countMes } = await qMes;
+    atencionesPeriodo = countMes;
+
+    // Mes anterior
+    let qPrev = supabase.from('atenciones').select('id, establecimiento:establecimientos!inner(microred_id)', { count: 'exact', head: true }).gte('fecha', startOfPrevMonth).lte('fecha', endOfPrevMonth);
+    if (establecimiento_id) qPrev = qPrev.eq('establecimiento_id', establecimiento_id);
+    if (microred_id) qPrev = qPrev.eq('establecimiento.microred_id', microred_id);
+    const { count: countPrev } = await qPrev;
+    atencionesPrev = countPrev;
   }
 
-  // Total positivas
-  let query3 = supabase
+  const diferenciaPeriodo = atencionesPrev > 0 ? (((atencionesPeriodo - atencionesPrev) / atencionesPrev) * 100).toFixed(1) : (atencionesPeriodo > 0 ? 100 : 0);
+
+  // 3. POSITIVAS DEL PERIODO (BI-RADS 4)
+  let queryPos = supabase
     .from('detalle_mamografia')
-    .select(`
-      birads_mx,
-      atencion:atenciones!inner(
-        establecimiento_id,
-        establecimiento:establecimientos(microred_id),
-        paciente:pacientes(dni)
-      )
-    `)
-    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.BI-RADS 5%,birads_mx.ilike.BI-RADS 6%,birads_mx.ilike.4%,birads_mx.ilike.5%,birads_mx.ilike.6%');
+    .select('birads_mx, atencion:atenciones!inner(fecha, establecimiento_id, establecimiento:establecimientos!inner(microred_id))')
+    .or('birads_mx.ilike.BI-RADS 4%,birads_mx.ilike.4%,birads_mx.ilike.birads: 4%');
   
-  if (establecimiento_id) {
-    query3 = query3.eq('atencion.establecimiento_id', establecimiento_id);
-  } else if (microred_id) {
-    query3 = query3.eq('atencion.establecimiento.microred_id', microred_id);
-  }
+  if (!isAnual) queryPos = queryPos.gte('atencion.fecha', startOfMonth).lte('atencion.fecha', endOfMonth);
+  if (establecimiento_id) queryPos = queryPos.eq('atencion.establecimiento_id', establecimiento_id);
+  if (microred_id) queryPos = queryPos.eq('atencion.establecimiento.microred_id', microred_id);
   
-  const biradsPositivos = await fetchAllRows(query3);
-  
-  const POSITIVOS_REGEX = /^\s*(BI-RADS[:\s]*)?[456][ABC]?/i;
-  const seenDnis = new Set();
-  (biradsPositivos || []).forEach(r => {
-    if (POSITIVOS_REGEX.test((r.birads_mx || '').trim())) {
-      const dni = r.atencion?.paciente?.dni;
-      if (dni) seenDnis.add(dni);
-    }
-  });
-  const totalPositivas = seenDnis.size;
+  const posRows = await fetchAllRows(queryPos);
+  const totalPositivasPeriodo = posRows.length;
 
-  const porcentajePositivas = totalAtenciones ? ((totalPositivas / totalAtenciones) * 100).toFixed(2) : 0;
-
-  // Atenciones por mes
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-  sixMonthsAgo.setDate(1);
-  let query4 = supabase
+  // 4. ATENCIONES POR MES (Gráfico Tendencia)
+  const today = new Date().toISOString().split('T')[0];
+  let queryGraph = supabase
     .from('atenciones')
-    .select('fecha, establecimiento:establecimientos(microred_id)')
-    .gte('fecha', sixMonthsAgo.toISOString().split('T')[0])
-    .order('fecha');
+    .select('fecha, establecimiento:establecimientos!inner(microred_id)')
+    .gte('fecha', isAnual ? '2026-01-01' : startOfMonth) // Si no es anual, mostrar solo el mes? No, mejor mostrar tendencia real
+    .lte('fecha', today);
   
-  if (establecimiento_id) {
-    query4 = query4.eq('establecimiento_id', establecimiento_id);
-  } else if (microred_id) {
-    query4 = supabase
-      .from('atenciones')
-      .select('fecha, establecimiento:establecimientos!inner(microred_id)')
-      .gte('fecha', sixMonthsAgo.toISOString().split('T')[0])
-      .eq('establecimiento.microred_id', microred_id)
-      .order('fecha');
+  if (!isAnual) {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+    queryGraph = queryGraph.gte('fecha', sixMonthsAgo.toISOString().split('T')[0]);
   }
 
-  const atencionesPorMesArray = await fetchAllRows(query4);
-  const meses = {};
-  atencionesPorMesArray.forEach(row => {
-    const mes = row.fecha.slice(0, 7);
-    meses[mes] = (meses[mes] || 0) + 1;
+  if (establecimiento_id) queryGraph = queryGraph.eq('establecimiento_id', establecimiento_id);
+  if (microred_id) queryGraph = queryGraph.eq('establecimiento.microred_id', microred_id);
+  
+  const atencionesGraph = await fetchAllRows(queryGraph.order('fecha'));
+  const mesesMap = {};
+  atencionesGraph.forEach(row => {
+    const m = row.fecha.slice(0, 7);
+    mesesMap[m] = (mesesMap[m] || 0) + 1;
   });
 
-  // Distribución BI-RADS
-  let query5 = supabase
+  // 5. DISTRIBUCIÓN BI-RADS DEL PERIODO
+  let queryBirads = supabase
     .from('detalle_mamografia')
-    .select(`
-      birads_mx,
-      atencion:atenciones!inner(
-        establecimiento_id,
-        establecimiento:establecimientos(microred_id)
-      )
-    `);
-  if (establecimiento_id) {
-    query5 = query5.eq('atencion.establecimiento_id', establecimiento_id);
-  } else if (microred_id) {
-    query5 = query5.eq('atencion.establecimiento.microred_id', microred_id);
-  }
+    .select('birads_mx, atencion:atenciones!inner(fecha, establecimiento_id, establecimiento:establecimientos!inner(microred_id))');
   
-  const biradsDist = await fetchAllRows(query5);
+  if (!isAnual) queryBirads = queryBirads.gte('atencion.fecha', startOfMonth).lte('atencion.fecha', endOfMonth);
+  if (establecimiento_id) queryBirads = queryBirads.eq('atencion.establecimiento_id', establecimiento_id);
+  if (microred_id) queryBirads = queryBirads.eq('atencion.establecimiento.microred_id', microred_id);
+  
+  const biradsRows = await fetchAllRows(queryBirads);
   const distribucionBirads = {};
-  biradsDist.forEach(row => {
+  biradsRows.forEach(row => {
     let raw = (row.birads_mx || '').trim().toUpperCase();
     if (!raw) return;
     let label = raw;
@@ -437,19 +427,33 @@ const getDashboardStats = async (filters = {}) => {
     distribucionBirads[label] = (distribucionBirads[label] || 0) + 1;
   });
 
-  // Establecimientos
+  // 6. PRODUCTIVIDAD Y TABLA DE AVANCE MENSUAL
   const { data: allEstsDB } = await supabase
     .from('establecimientos')
     .select('id, nombre, meta_anual, microred_id, microred:microredes(nombre)');
 
-  let query7 = supabase.from('atenciones').select('establecimiento_id');
-  if (establecimiento_id) query7 = query7.eq('establecimiento_id', establecimiento_id);
-  const counts = await fetchAllRows(query7);
+  // Obtener todas las atenciones del año para la tabla de avance (siempre mostramos todos para comparar, o filtramos?)
+  // El usuario dice "se adapte al filtro", así que si filtra por sede, solo mostramos esa sede en la tabla también.
+  let queryAllYear = supabase
+    .from('atenciones')
+    .select('establecimiento_id, fecha, establecimiento:establecimientos!inner(microred_id)')
+    .gte('fecha', '2026-01-01')
+    .lte('fecha', today);
+  
+  if (establecimiento_id) queryAllYear = queryAllYear.eq('establecimiento_id', establecimiento_id);
+  if (microred_id) queryAllYear = queryAllYear.eq('establecimiento.microred_id', microred_id);
+  
+  const allYearAtenciones = await fetchAllRows(queryAllYear);
 
-  const atencionesMap = {};
-  counts.forEach(c => {
-    if (c.establecimiento_id) atencionesMap[c.establecimiento_id] = (atencionesMap[c.establecimiento_id] || 0) + 1;
+  const matrix = {}; 
+  allYearAtenciones.forEach(att => {
+    const estId = att.establecimiento_id;
+    const mesKey = att.fecha.slice(0, 7);
+    if (!matrix[estId]) matrix[estId] = {};
+    matrix[estId][mesKey] = (matrix[estId][mesKey] || 0) + 1;
   });
+
+  const availableMonths = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06'];
 
   const allEstablecimientos = allEstsDB
     .filter(est => {
@@ -457,36 +461,37 @@ const getDashboardStats = async (filters = {}) => {
       if (microred_id) return est.microred_id === parseInt(microred_id);
       return true;
     })
-    .map(est => ({
-      id: est.id,
-      nombre: est.nombre,
-      microred: est.microred?.nombre || 'SIN MICRORED',
-      microred_id: est.microred_id,
-      cantidad: atencionesMap[est.id] || 0,
-      meta: est.meta_anual || 0
-    })).sort((a, b) => b.cantidad - a.cantidad);
-
-  // Comparativa por Microred
-  const comparativaMicroredes = {};
-  allEstablecimientos.forEach(est => {
-    const mrName = est.microred;
-    if (!comparativaMicroredes[mrName]) {
-      comparativaMicroredes[mrName] = { nombre: mrName, cantidad: 0, meta: 0 };
-    }
-    comparativaMicroredes[mrName].cantidad += est.cantidad;
-    comparativaMicroredes[mrName].meta += est.meta;
-  });
+    .map(est => {
+      const rowCounts = matrix[est.id] || {};
+      const totalAnualReal = Object.values(rowCounts).reduce((a, b) => a + b, 0);
+      const currentMonthCount = rowCounts[targetMes] || 0;
+      const metaMensual = Math.round((est.meta_anual || 0) / 12);
+      
+      return {
+        id: est.id,
+        nombre: est.nombre,
+        microred: est.microred?.nombre || 'SIN MICRORED',
+        cantidad: isAnual ? totalAnualReal : currentMonthCount,
+        meta_periodo: isAnual ? (est.meta_anual || 0) : metaMensual,
+        meta_anual: est.meta_anual || 0,
+        avance_mensual: availableMonths.map(m => rowCounts[m] || 0)
+      };
+    }).sort((a, b) => b.cantidad - a.cantidad);
 
   return {
-    totalAtenciones,
-    totalPacientes: finalTotalPacientes,
-    totalPositivas,
-    porcentajePositivas,
-    atencionesPorMes: Object.entries(meses).map(([mes, cantidad]) => ({ mes, cantidad })),
+    mesSeleccionado: isAnual ? 'Anual 2026' : targetMes,
+    isAnual,
+    totalAtencionesAcumulado: totalAtenciones,
+    atencionesMes: atencionesPeriodo,
+    atencionesPrev,
+    diferenciaMes: diferenciaPeriodo,
+    totalPositivasMes: totalPositivasPeriodo,
+    atencionesPorMes: Object.entries(mesesMap).map(([mes, cantidad]) => ({ mes, cantidad })),
     distribucionBirads,
     topEstablecimientos: allEstablecimientos.slice(0, 5),
     allEstablecimientos,
-    comparativaMicroredes: Object.values(comparativaMicroredes).sort((a, b) => b.cantidad - a.cantidad)
+    establecimientosList: allEstsDB.map(e => ({ id: e.id, nombre: e.nombre })).sort((a,b) => a.nombre.localeCompare(b.nombre)),
+    availableMonths
   };
 };
 

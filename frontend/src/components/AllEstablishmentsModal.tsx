@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProgressColor, getProgressTextColor } from '../utils/colors';
 
-const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtenciones }) => {
+const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtenciones, mesSeleccionado }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Filtrar y ordenar: Primero por cantidad, luego alfabéticamente
@@ -38,9 +38,9 @@ const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtencion
               <div>
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                   <Building2 size={20} className="text-accent" />
-                  Productividad por Establecimiento
+                  Productividad por Establecimiento ({mesSeleccionado})
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Listado completo de avances vs metas anuales</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Avances mensuales vs metas programadas (1/12 de meta anual)</p>
               </div>
               <button 
                 onClick={onClose}
@@ -66,8 +66,8 @@ const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtencion
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                 {filtered.map((est, idx) => {
-                  const hasMeta = est.meta > 0;
-                  const percentage = hasMeta ? Math.min((est.cantidad / est.meta) * 100, 100) : (est.cantidad / totalAtenciones) * 100;
+                  const hasMeta = est.meta_mensual > 0;
+                  const percentage = hasMeta ? Math.min((est.cantidad / est.meta_mensual) * 100, 100) : 0;
                   const progressColor = hasMeta ? getProgressColor(percentage) : 'bg-slate-400';
                   const progressTextColor = hasMeta ? getProgressTextColor(percentage) : 'text-slate-400';
                   
@@ -80,7 +80,7 @@ const AllEstablishmentsModal = ({ isOpen, onClose, establishments, totalAtencion
                           </span>
                           {hasMeta && (
                             <span className="text-[10px] text-slate-400 font-medium">
-                              Meta: {est.meta}
+                              Meta Mensual: {est.meta_mensual}
                             </span>
                           )}
                         </div>

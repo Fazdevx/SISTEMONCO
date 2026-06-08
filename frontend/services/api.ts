@@ -41,7 +41,10 @@ export const mammographyApi = {
   create: (data) => api.post("/mammographies", data),
   update: (id, data) => api.put(`/mammographies/${id}`, data),
   delete: (id) => api.delete(`/mammographies/${id}`),
-  getStats: () => api.get("/mammographies/stats/dashboard"),
+  getStats: (filters = {}) => {
+    const params = new URLSearchParams(filters);
+    return api.get(`/mammographies/stats/dashboard?${params.toString()}`);
+  },
   export: (filters = {}) => {
     const stringFilters = Object.entries(filters).reduce(
       (acc: any, [k, v]) => ({ ...acc, [k]: String(v) }),

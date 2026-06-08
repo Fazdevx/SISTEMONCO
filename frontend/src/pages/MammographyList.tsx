@@ -38,6 +38,7 @@ export default function MammographyList() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBirads, setFilterBirads] = useState('');
   const [filterEstablecimiento, setFilterEstablecimiento] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
 
   // Historial Paciente
   const [historyDni, setHistoryDni] = useState<string | null>(null);
@@ -66,8 +67,9 @@ export default function MammographyList() {
     if (debouncedSearch) filters.dni = debouncedSearch;
     if (filterBirads) filters.birads_mx = filterBirads;
     if (filterEstablecimiento) filters.establecimiento_id = filterEstablecimiento;
+    if (filterMonth) filters.mes = filterMonth;
     return filters;
-  }, [debouncedSearch, filterBirads, filterEstablecimiento]);
+  }, [debouncedSearch, filterBirads, filterEstablecimiento, filterMonth]);
 
   const { data, isLoading: loading } = useMammographiesList(page, 10, apiFilters);
   const mammographies = data?.data || [];
@@ -188,11 +190,33 @@ export default function MammographyList() {
             </select>
           </div>
 
+          <div className="md:col-span-2 relative">
+            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <select
+              value={filterMonth}
+              onChange={(e) => { setFilterMonth(e.target.value); setPage(1); }}
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-2xl focus:outline-none focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all text-sm font-bold text-slate-700 dark:text-slate-200 appearance-none cursor-pointer"
+            >
+              <option value="">Todos los Meses</option>
+              {[
+                { val: '2026-01', label: 'Enero 2026' },
+                { val: '2026-02', label: 'Febrero 2026' },
+                { val: '2026-03', label: 'Marzo 2026' },
+                { val: '2026-04', label: 'Abril 2026' },
+                { val: '2026-05', label: 'Mayo 2026' },
+                { val: '2026-06', label: 'Junio 2026' },
+              ].map(m => (
+                <option key={m.val} value={m.val}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="md:col-span-1">
             <button
               onClick={() => {
                 setSearch('');
                 setFilterBirads('');
+                setFilterMonth('');
                 if (isAdmin) setFilterEstablecimiento('');
                 setPage(1);
               }}
