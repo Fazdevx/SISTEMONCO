@@ -3,10 +3,7 @@
   "builds": [
     {
       "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["backend/**"]
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "frontend/package.json",
@@ -19,24 +16,19 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "backend/server.js"
+      "destination": "/backend/server.js"
+    },
+    {
+      "source": "/(assets/.*)",
+      "destination": "/frontend/$1"
+    },
+    {
+      "source": "/(.*\\.(png|ico|jpg|jpeg|svg|css|js|json|woff2?))",
+      "destination": "/frontend/$1"
     },
     {
       "source": "/(.*)",
-      "destination": "frontend/$1"
-    },
-    {
-      "experimentalServices": {
-        "frontend": {
-          "root": "frontend",
-          "routePrefix": "/",
-          "framework": "vite"
-        },
-        "backend": {
-          "root": "backend",
-          "routePrefix": "/_/backend"
-        }
-      }
+      "destination": "/frontend/index.html"
     }
   ]
 }
