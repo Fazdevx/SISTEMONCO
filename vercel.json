@@ -4,12 +4,16 @@
     {
       "src": "backend/server.js",
       "use": "@vercel/node",
-      "config": { "includeFiles": ["backend/**"] }
+      "config": {
+        "includeFiles": ["backend/**"]
+      }
     },
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": {
+        "distDir": "dist"
+      }
     }
   ],
   "rewrites": [
