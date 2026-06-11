@@ -1,7 +1,7 @@
 import axios from "axios";
 import { supabase } from "./supabase";
 
-const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/_/backend/api" : "http://localhost:3000/api");
+const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
