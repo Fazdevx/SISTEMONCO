@@ -1,6 +1,6 @@
 // services/mammographyService.js
 const supabase = require('../config/supabase');
-const { notifyPositiveCases } = require('./notificationService');
+const { notifyPositiveCases } = require('./notificationservice');
 
 const insertMammographyBatch = async (mammographyData) => {
   if (!mammographyData || mammographyData.length === 0) {
