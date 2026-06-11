@@ -1,23 +1,21 @@
 const { createClient } = require("@supabase/supabase-js");
-const ws = require("ws");
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE) {
-  console.error("ERROR CRÍTICO: Variables de entorno faltantes en el Backend");
-  console.error("SUPABASE_URL:", process.env.SUPABASE_URL ? "OK" : "FALTA");
-  console.error(
-    "SUPABASE_SERVICE_ROLE:",
-    process.env.SUPABASE_SERVICE_ROLE ? "OK" : "FALTA",
-  );
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE;
+
+if (!supabaseUrl || !supabaseServiceRole) {
+  console.error("ERROR: Faltan variables de entorno de Supabase en el Backend.");
+  console.error("Verifique SUPABASE_URL y SUPABASE_SERVICE_ROLE en el panel de Vercel.");
 }
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE,
+  supabaseUrl || "",
+  supabaseServiceRole || "",
   {
     auth: {
       persistSession: false,
     },
-  },
+  }
 );
 
 module.exports = supabase;
